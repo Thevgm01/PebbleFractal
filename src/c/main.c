@@ -1,33 +1,15 @@
-/*
- * Classic Analog Watch Face for Pebble Time 2
- * Display: 200x228 pixels (color)
- *
- * Features:
- *  - Hour, minute, and second hands
- *  - Minute and hour tick marks around the bezel
- *  - Date display at the 3 o'clock position
- *  - Red accent second hand with counterweight tail
- */
-
 #include <pebble.h>
-
-// ── Layout constants ──────────────────────────────────────────────────────────
-// Pebble Time 2 is 200×228. We draw a circular clock face centred in the window.
-#define CLOCK_RADIUS   92    // px — fits comfortably inside the 200-wide display
-#define HOUR_HAND_LEN  52
-#define HOUR_TAIL_LEN  16
-#define MIN_HAND_LEN   78
-#define MIN_TAIL_LEN   16
-#define SEC_HAND_LEN   84
-#define SEC_TAIL_LEN   22
-#define CENTER_DOT_R    6
 
 //#define FASTMODE
 
-#define MAX_DEPTH 8
+#define CLOCK_RADIUS 92
+
+#define MINUTE_HAND_LENGTH 30
 #define HOUR_HAND_SCALE 7 / 10
-#define RECURSE_SCALE 9 / 10
 #define TRUE_HAND_BORDER_RATIO 20 / 10
+
+#define MAX_RECURSION_DEPTH 8
+#define RECURSE_SCALE 9 / 10
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 static Window *s_window;
@@ -39,7 +21,7 @@ static int32_t s_minute_angle;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Convert a 0..TRIG_MAX_ANGLE angle + radius into a GPoint relative to center.
+// Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int32_t angle, int32_t radius) {
   return (GPoint){
     .x = origin.x + (int32_t)(sin_lookup(angle) * radius / TRIG_MAX_RATIO),
@@ -47,28 +29,35 @@ static GPoint point_on_circle(GPoint origin, int32_t angle, int32_t radius) {
   };
 }
 
+// The main important function
 static void draw_hands_recursive(GContext *ctx, GPoint center, 
                                  int32_t angle, int32_t radius, int8_t depth) {
   
+  // Figure out where my hands should be pointing
   int32_t local_hour_angle = (angle + s_hour_angle) % TRIG_MAX_ANGLE;
   int32_t local_minute_angle = (angle + s_minute_angle) % TRIG_MAX_ANGLE;
   GPoint hour_point = point_on_circle(center, local_hour_angle, radius * HOUR_HAND_SCALE);
   GPoint minute_point = point_on_circle(center, local_minute_angle, radius);
   
-  if (depth < MAX_DEPTH) {
+  // Recurse before drawing so that earlier branches appear on top
+  if (depth < MAX_RECURSION_DEPTH) {
     draw_hands_recursive(ctx, minute_point, local_minute_angle, radius * RECURSE_SCALE, depth + 1);
     draw_hands_recursive(ctx, hour_point, local_hour_angle, radius * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
     
+    // The initial hands get a thick border around them to make it easier to actually read the time
     if (depth == 0) {
       graphics_context_set_stroke_color(ctx, GColorBlack);
-      graphics_context_set_stroke_width(ctx, MAX_DEPTH * TRUE_HAND_BORDER_RATIO);
+      graphics_context_set_stroke_width(ctx, (MAX_RECURSION_DEPTH + 1) * TRUE_HAND_BORDER_RATIO);
       graphics_draw_line(ctx, center, minute_point);
       graphics_draw_line(ctx, center, hour_point);
       graphics_context_set_stroke_color(ctx, GColorWhite);
     }
   }
   
-  graphics_context_set_stroke_width(ctx, MAX_DEPTH - depth + 1);
+  // According to the documentation, only odd width values are supported?
+  graphics_context_set_stroke_width(ctx, MAX_RECURSION_DEPTH - depth + 1);
+  
+  // Finally draw the lines
   graphics_draw_line(ctx, center, minute_point);
   graphics_draw_line(ctx, center, hour_point);
 }
@@ -111,15 +100,15 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
   s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
   #ifdef FASTMODE
-  s_hour_angle = minute_angle;
+  s_hour_angle = s_minute_angle;
   s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
   #endif
   
   graphics_context_set_stroke_color(ctx, GColorWhite);
-  draw_hands_recursive(ctx, center, 0, 30, 0);
+  draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
 }
 
-// ── Tick handler ─────────────────────────────────────────────────────────────
+// --- Ticks --- //
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Redraw the clock hands every second
   layer_mark_dirty(s_canvas_layer);
@@ -132,7 +121,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 }
 
-// ── Window lifecycle ──────────────────────────────────────────────────────────
+// --- Window --- //
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect  bounds = layer_get_bounds(root);
@@ -166,7 +155,7 @@ static void window_unload(Window *window) {
   text_layer_destroy(s_date_layer);
 }
 
-// ── App lifecycle ─────────────────────────────────────────────────────────────
+// --- Initialization --- //
 static void init(void) {
   s_window = window_create();
   window_set_background_color(s_window, GColorBlack);
@@ -176,7 +165,8 @@ static void init(void) {
   });
   window_stack_push(s_window, true);
 
-  // Subscribe to second-level ticks for the second hand
+  // Subscribe to ticks every second
+  // Even though we only have a minute-hand, the fractal can move a lot with only small inputs
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
 }
 
