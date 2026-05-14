@@ -1,0 +1,32 @@
+{
+    "author": "MakeAwesomeHappen",
+    "dependencies": {},
+    "keywords": [
+        "pebble-app"
+    ],
+    "name": "watchface-tutorial",
+    "pebble": {
+        "displayName": "Tutorial Watchface",
+        "enableMultiJS": true,
+        "messageKeys": [],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "emery",
+            "flint",
+            "gabbro"
+        ],
+        "uuid": "65ce2d9c-6e64-4e97-ae60-b3d90693f9ad",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "1.0.0"
+}
