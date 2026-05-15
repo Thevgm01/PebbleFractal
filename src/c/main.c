@@ -3,13 +3,14 @@
 #define FASTMODE
 
 #define CLOCK_RADIUS 92
+//#define TAPER
 
-#define MINUTE_HAND_LENGTH 30
+#define MINUTE_HAND_LENGTH 50
 #define HOUR_HAND_SCALE 7 / 10
 #define TRUE_HAND_BORDER_RATIO 20 / 10
 
 #define MAX_RECURSION_DEPTH 8
-#define RECURSE_SCALE 9 / 10
+#define RECURSE_SCALE 7 / 10
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -45,6 +46,7 @@ static void draw_hands_recursive(GContext *ctx, GPoint center,
     draw_hands_recursive(ctx, hour_point, local_hour_angle, radius * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
     
     // The initial hands get a thick border around them to make it easier to actually read the time
+    #ifdef TAPER
     if (depth == 0) {
       graphics_context_set_stroke_color(ctx, GColorBlack);
       graphics_context_set_stroke_width(ctx, (MAX_RECURSION_DEPTH + 1) * TRUE_HAND_BORDER_RATIO);
@@ -52,10 +54,15 @@ static void draw_hands_recursive(GContext *ctx, GPoint center,
       graphics_draw_line(ctx, center, hour_point);
       graphics_context_set_stroke_color(ctx, GColorWhite);
     }
+    #endif
   }
   
   // According to the documentation, only odd width values are supported?
+  #ifdef TAPER
   graphics_context_set_stroke_width(ctx, MAX_RECURSION_DEPTH - depth + 1);
+  #else
+  graphics_context_set_stroke_width(ctx, 1);
+  #endif
   
   // Finally draw the lines
   graphics_draw_line(ctx, center, minute_point);
