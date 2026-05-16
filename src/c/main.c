@@ -1,18 +1,19 @@
 #include <pebble.h>
 
-#define FASTMODE
+//#define FASTMODE
 
 #define CLOCK_RADIUS 92
 #define TAPER
 
 #define CIRCLES
 
-#define MINUTE_HAND_LENGTH 60
+#define MINUTE_HAND_LENGTH 40
 #define HOUR_HAND_SCALE 7 / 10
+#define THICKNESS_MULT 1 / 2
 #define TRUE_HAND_BORDER_RATIO 20 / 10
 
-#define MAX_RECURSION_DEPTH 3
-#define RECURSE_SCALE 7 / 10
+#define MAX_RECURSION_DEPTH 7
+#define RECURSE_SCALE 17 / 20
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -32,12 +33,19 @@ static GPathInfo FRACTAL_PATH_INFO = {
 
 // --- Drawing Functions --- //
 
+static GPoint add_to_GPoint(GPoint a, int16_t x, int16_t y) {
+  return (GPoint){ .x = a.x + x, .y = a.y + y };
+}
+
+static GPoint add_GPoints(GPoint a, GPoint b) {
+  return (GPoint){ .x = a.x + b.x, .y = a.y + b.y };
+}
+
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int32_t angle, int32_t radius) {
-  return (GPoint){
-    .x = origin.x + (int32_t)(sin_lookup(angle) * radius / TRIG_MAX_RATIO),
-    .y = origin.y - (int32_t)(cos_lookup(angle) * radius / TRIG_MAX_RATIO),
-  };
+  return add_to_GPoint(origin,
+    sin_lookup(angle) * radius / TRIG_MAX_RATIO,
+    -cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 }
 
 static int32_t add_angles2(int32_t angle1, int32_t angle2) {
@@ -118,6 +126,39 @@ static void draw_hands_recursive2(GContext *ctx, GPoint center,
   #endif
 }
 
+static void draw_hands_recursive3(GContext *ctx, GPoint origin, 
+                                 int32_t base_angle, int32_t length, int8_t depth) {
+  
+  // Figure out where my hands should be pointing
+  int32_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
+  int32_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
+  GPoint hour_point = point_on_circle(origin, new_hour_angle, length * HOUR_HAND_SCALE);
+  GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
+  
+  // Recurse before drawing so that earlier branches appear on top
+  if (depth < MAX_RECURSION_DEPTH) {
+    draw_hands_recursive3(ctx, minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive3(ctx, hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
+  }
+  
+  uint16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
+  
+  if (half_width <= 1) {
+    graphics_draw_line(ctx, origin, minute_point);
+    graphics_draw_line(ctx, origin, hour_point);
+  }
+  else {
+    uint16_t next_half_width = half_width - 1;
+    uint16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
+    uint16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
+    
+    graphics_draw_line(ctx, point_on_circle(origin, minute_normal_angle, half_width), point_on_circle(minute_point, minute_normal_angle, next_half_width));
+    graphics_draw_line(ctx, point_on_circle(origin, minute_normal_angle, -half_width), point_on_circle(minute_point, minute_normal_angle, -next_half_width));
+    graphics_draw_line(ctx, point_on_circle(origin, hour_normal_angle, half_width), point_on_circle(hour_point, hour_normal_angle, next_half_width));
+    graphics_draw_line(ctx, point_on_circle(origin, hour_normal_angle, -half_width), point_on_circle(hour_point, hour_normal_angle, -next_half_width));
+  }
+}
+
 // Gets called on tick
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -158,17 +199,18 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
   #endif
   
-  s_fractal_index = 0;
-  draw_hands_recursive(ctx, GPoint(0, 0), 0, MINUTE_HAND_LENGTH, 0);
+  //s_fractal_index = 0;
+  //draw_hands_recursive(ctx, GPoint(0, 0), 0, MINUTE_HAND_LENGTH, 0);
   
-  graphics_context_set_stroke_color(ctx, GColorWhite);
-  gpath_move_to(s_fractal_path, center);
-  gpath_draw_outline(ctx, s_fractal_path);
-
-  //graphics_context_set_antialiased(ctx, true);
   //graphics_context_set_stroke_color(ctx, GColorWhite);
-  //graphics_context_set_fill_color(ctx, GColorWhite);
-  //draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
+  //gpath_move_to(s_fractal_path, center);
+  //gpath_draw_outline(ctx, s_fractal_path);
+
+  graphics_context_set_antialiased(ctx, true);
+  graphics_context_set_stroke_width(ctx, 1);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  draw_hands_recursive3(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
 }
 
 // --- Ticks --- //
