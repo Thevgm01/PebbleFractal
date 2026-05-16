@@ -50,24 +50,26 @@ static int32_t add_angles3(int32_t angle1, int32_t angle2, int32_t angle3) {
 
 // The main important function
 static void draw_hands_recursive(GContext *ctx, GPoint center, 
-                                 int32_t base_angle, int32_t length1, int32_t length2, int8_t depth) {
+                                 int32_t base_angle, int32_t length, int8_t depth) {
   
   // Figure out where my hands should be pointing
   int32_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int32_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
-  GPoint hour_point = point_on_circle(center, new_hour_angle, length1);
-  GPoint minute_point = point_on_circle(center, new_minute_angle, length2);
+  GPoint hour_point = point_on_circle(center, new_hour_angle, length * HOUR_HAND_SCALE);
+  GPoint minute_point = point_on_circle(center, new_minute_angle, length);
   
   //int32_t half_thickness = MAX_RECURSION_DEPTH - depth + 1 + 10;
   //half_thickness = 20;
   
-  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles3(base_angle, TRIG_MAX_ANGLE * 3 / 4, s_minute_angle / 2), 10);
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles2(base_angle, TRIG_MAX_ANGLE * 3 / 4), 10);
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles2(new_minute_angle, TRIG_MAX_ANGLE * 3 / 4), 10);
   if (depth <= MAX_RECURSION_DEPTH) {
-    draw_hands_recursive(ctx, minute_point, new_minute_angle, length1 * RECURSE_SCALE, length2 * RECURSE_SCALE, depth + 1);
-    //s_fractal_points[s_fractal_index++] = point_on_circle(center, new_hour_angle / 2 + new_minute_angle / 2, 10);
-    //draw_hands_recursive(ctx, hour_point, new_hour_angle, length1 * RECURSE_SCALE, length2 * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive(ctx, minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
+    s_fractal_points[s_fractal_index++] = point_on_circle(center, new_minute_angle / 2 + new_hour_angle / 2, 10);
+    draw_hands_recursive(ctx, hour_point, new_hour_angle, length * RECURSE_SCALE * HOUR_HAND_SCALE, depth + 1);
   }
-  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles3(base_angle, TRIG_MAX_ANGLE * 1 / 4, TRIG_MAX_ANGLE - s_hour_angle / 2), 10);
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles2(new_hour_angle, TRIG_MAX_ANGLE * 1 / 4), 10);
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles2(base_angle, TRIG_MAX_ANGLE * 1 / 4), 10);
 }
 
 static void draw_hands_recursive2(GContext *ctx, GPoint center, 
@@ -157,7 +159,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   #endif
   
   s_fractal_index = 0;
-  draw_hands_recursive(ctx, GPoint(0, 0), 0, MINUTE_HAND_LENGTH * HOUR_HAND_SCALE, MINUTE_HAND_LENGTH, 0);
+  draw_hands_recursive(ctx, GPoint(0, 0), 0, MINUTE_HAND_LENGTH, 0);
   
   graphics_context_set_stroke_color(ctx, GColorWhite);
   gpath_move_to(s_fractal_path, center);
