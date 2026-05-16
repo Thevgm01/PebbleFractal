@@ -20,8 +20,8 @@
             "chalk",
             "diorite",
             "emery",
-            "flint",
-            "gabbro"
+            "gabbro",
+            "flint"
         ],
         "uuid": "65ce2d9c-6e64-4e97-ae60-b3d90693f9ad",
         "watchapp": {

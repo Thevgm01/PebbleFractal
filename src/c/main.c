@@ -1,8 +1,6 @@
 #include <pebble.h>
 
-//#define FASTMODE
-
-#define CLOCK_RADIUS 92
+#define FASTMODE
 
 //#define CIRCLES
 
@@ -12,11 +10,12 @@
 #define TRUE_HAND_BORDER_RATIO 20 / 10
 
 #define MAX_RECURSION_DEPTH 7
-#define RECURSE_SCALE 17 / 20
+#define RECURSE_SCALE 18 / 20
 
 // --- Static Variables --- //
 static Window *s_window;
-static Layer *s_canvas_layer;
+static Layer *s_fractal_layer;
+static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
 
 static int32_t s_hour_angle;
@@ -87,43 +86,29 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
       graphics_draw_line(ctx, // Right hour line
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
+      
+      // Draw a circle at the very center
+      if (depth == 0) {
+        graphics_draw_circle(ctx, origin, half_width);
+      }
     }
   #endif
 }
 
 // Gets called on tick
-static void canvas_update_proc(Layer *layer, GContext *ctx) {
+static void fractal_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
-
-  // Current time
-  time_t now = time(NULL);
-  struct tm* t = localtime(&now);
 
   // Background
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-
-  // Outer ring
-  graphics_context_set_stroke_color(ctx, GColorDarkGray);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, center, CLOCK_RADIUS);
-
-  // Tick marks
-  for (int i = 0; i < 60; i++) {
-    int16_t angle = TRIG_MAX_ANGLE * i / 60;
-    bool is_hour = (i % 5 == 0);
-    int outer_r = CLOCK_RADIUS - 2;
-    int inner_r = is_hour ? CLOCK_RADIUS - 14 : CLOCK_RADIUS - 7;
-
-    GPoint outer = point_on_circle(center, angle, outer_r);
-    GPoint inner = point_on_circle(center, angle, inner_r);
-
-    graphics_context_set_stroke_color(ctx, is_hour ? GColorWhite : GColorDarkGray);
-    graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
-    graphics_draw_line(ctx, inner, outer);
-  }
   
+  // Current time
+  time_t now = time(NULL);
+  struct tm* t = localtime(&now);
+
+  // Convert to angle  
   s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
   s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
   #ifdef FASTMODE
@@ -131,16 +116,40 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
   #endif
 
+  // Draw fractal
   graphics_context_set_antialiased(ctx, true);
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
 }
 
+static void notch_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  GPoint center = grect_center_point(&bounds);
+  GSize size = bounds.size;
+  
+  int16_t min_bound = (size.w < size.h ? size.w : size.h) / 2;
+  int16_t squircleish_offsets[] = {0, 1, 2, 4, 7, 11, 15, 15, 15, 11, 7, 4, 2, 1, 0};
+  
+  // Tick marks
+  for (int16_t i = 0; i < 60; i++) {
+    int16_t angle = TRIG_MAX_ANGLE * i / 60;
+    bool is_hour = (i % 5 == 0);
+    int16_t outer_r = min_bound + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
+    int16_t inner_r = outer_r - (is_hour ? 12 : 5);
+    GPoint outer = point_on_circle(center, angle, outer_r);
+    GPoint inner = point_on_circle(center, angle, inner_r);
+
+    graphics_context_set_stroke_color(ctx, is_hour ? GColorLightGray : GColorDarkGray);
+    graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
+    graphics_draw_line(ctx, inner, outer);
+  }
+}
+
 // --- Ticks --- //
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  // Redraw the clock hands every second
-  layer_mark_dirty(s_canvas_layer);
+  // Redraw the fractal every second
+  layer_mark_dirty(s_fractal_layer);
 
   // Update the date label once a minute (or on first load)
   if (units_changed & MINUTE_UNIT || units_changed & DAY_UNIT) {
@@ -153,12 +162,17 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 // --- Window --- //
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
-  GRect  bounds = layer_get_bounds(root);
+  GRect bounds = layer_get_bounds(root);
 
-  // Canvas fills the whole window
-  s_canvas_layer = layer_create(bounds);
-  layer_set_update_proc(s_canvas_layer, canvas_update_proc);
-  layer_add_child(root, s_canvas_layer);
+  // Fractal layer
+  s_fractal_layer = layer_create(bounds);
+  layer_set_update_proc(s_fractal_layer, fractal_update_proc);
+  layer_add_child(root, s_fractal_layer);
+  
+  // Notch layer
+  s_notch_layer = layer_create(bounds);
+  layer_set_update_proc(s_notch_layer, notch_update_proc);
+  layer_add_child(root, s_notch_layer);
 
   // Date label — positioned at the 3 o'clock area (right of center)
   // Pebble Time 2 center is (100, 114); 3 o'clock sits ~ x=148
@@ -167,12 +181,12 @@ static void window_load(Window *window) {
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorLightGray);
   text_layer_set_font(s_date_layer,
-    fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
-  layer_add_child(s_canvas_layer, text_layer_get_layer(s_date_layer));
+  layer_add_child(root, text_layer_get_layer(s_date_layer));
 
   // Trigger an immediate date update so the label isn't blank on launch
-  time_t     now = time(NULL);
+  time_t now = time(NULL);
   struct tm *t   = localtime(&now);
   static char date_buf[16];
   strftime(date_buf, sizeof(date_buf), "%a %d", t);
@@ -180,7 +194,8 @@ static void window_load(Window *window) {
 }
 
 static void window_unload(Window *window) {
-  layer_destroy(s_canvas_layer);
+  layer_destroy(s_fractal_layer);
+  layer_destroy(s_notch_layer);
   text_layer_destroy(s_date_layer);
 }
 
