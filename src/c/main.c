@@ -7,7 +7,7 @@
 #define MINUTE_HAND_LENGTH 40
 #define HOUR_HAND_SCALE 7 / 10
 #define THICKNESS_MULT 1 / 2
-#define TRUE_HAND_BORDER_RATIO 20 / 10
+#define TRUE_HAND_LENGTH 100
 
 #define MAX_RECURSION_DEPTH 7
 #define RECURSE_SCALE 18 / 20
@@ -121,6 +121,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
+  
+  graphics_draw_line(ctx, center, point_on_circle(center, s_minute_angle, TRUE_HAND_LENGTH));
+  graphics_draw_line(ctx, center, point_on_circle(center, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -132,7 +135,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   int16_t squircleish_offsets[] = {0, 1, 2, 4, 7, 11, 15, 15, 15, 11, 7, 4, 2, 1, 0};
   
   // Tick marks
-  for (int16_t i = 0; i < 60; i++) {
+  for (int i = 0; i < 60; i++) {
     int16_t angle = TRIG_MAX_ANGLE * i / 60;
     bool is_hour = (i % 5 == 0);
     int16_t outer_r = min_bound + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
@@ -154,7 +157,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Update the date label once a minute (or on first load)
   if (units_changed & MINUTE_UNIT || units_changed & DAY_UNIT) {
     static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %d", tick_time);
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
     text_layer_set_text(s_date_layer, date_buf);
   }
 }
@@ -176,7 +179,7 @@ static void window_load(Window *window) {
 
   // Date label — positioned at the 3 o'clock area (right of center)
   // Pebble Time 2 center is (100, 114); 3 o'clock sits ~ x=148
-  GRect date_rect = GRect(136, 104, 52, 20);
+  GRect date_rect = GRect(bounds.size.w / 2, 104, 70, 20);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorLightGray);
@@ -189,7 +192,7 @@ static void window_load(Window *window) {
   time_t now = time(NULL);
   struct tm *t   = localtime(&now);
   static char date_buf[16];
-  strftime(date_buf, sizeof(date_buf), "%a %d", t);
+  strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
   text_layer_set_text(s_date_layer, date_buf);
 }
 
