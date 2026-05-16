@@ -11,8 +11,8 @@
 #define HOUR_HAND_SCALE 7 / 10
 #define TRUE_HAND_BORDER_RATIO 20 / 10
 
-#define MAX_RECURSION_DEPTH 7
-#define RECURSE_SCALE 8 / 10
+#define MAX_RECURSION_DEPTH 3
+#define RECURSE_SCALE 7 / 10
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -21,6 +21,14 @@ static TextLayer *s_date_layer;
 
 static int32_t s_hour_angle;
 static int32_t s_minute_angle;
+
+static int32_t s_fractal_index;
+static GPath* s_fractal_path = NULL;
+static GPoint s_fractal_points[200];
+static GPathInfo FRACTAL_PATH_INFO = {
+  .num_points = 200,
+  .points = s_fractal_points
+};
 
 // --- Drawing Functions --- //
 
@@ -32,8 +40,37 @@ static GPoint point_on_circle(GPoint origin, int32_t angle, int32_t radius) {
   };
 }
 
+static int32_t add_angles2(int32_t angle1, int32_t angle2) {
+  return (angle1 + angle2) % TRIG_MAX_ANGLE;
+}
+
+static int32_t add_angles3(int32_t angle1, int32_t angle2, int32_t angle3) {
+  return (angle1 + angle2 + angle3) % TRIG_MAX_ANGLE;
+}
+
 // The main important function
 static void draw_hands_recursive(GContext *ctx, GPoint center, 
+                                 int32_t base_angle, int32_t length1, int32_t length2, int8_t depth) {
+  
+  // Figure out where my hands should be pointing
+  int32_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
+  int32_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
+  GPoint hour_point = point_on_circle(center, new_hour_angle, length1);
+  GPoint minute_point = point_on_circle(center, new_minute_angle, length2);
+  
+  //int32_t half_thickness = MAX_RECURSION_DEPTH - depth + 1 + 10;
+  //half_thickness = 20;
+  
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles3(base_angle, TRIG_MAX_ANGLE * 3 / 4, s_minute_angle / 2), 10);
+  if (depth <= MAX_RECURSION_DEPTH) {
+    draw_hands_recursive(ctx, minute_point, new_minute_angle, length1 * RECURSE_SCALE, length2 * RECURSE_SCALE, depth + 1);
+    //s_fractal_points[s_fractal_index++] = point_on_circle(center, new_hour_angle / 2 + new_minute_angle / 2, 10);
+    //draw_hands_recursive(ctx, hour_point, new_hour_angle, length1 * RECURSE_SCALE, length2 * RECURSE_SCALE, depth + 1);
+  }
+  s_fractal_points[s_fractal_index++] = point_on_circle(center, add_angles3(base_angle, TRIG_MAX_ANGLE * 1 / 4, TRIG_MAX_ANGLE - s_hour_angle / 2), 10);
+}
+
+static void draw_hands_recursive2(GContext *ctx, GPoint center, 
                                  int32_t angle, int32_t radius, int8_t depth) {
   
   // Figure out where my hands should be pointing
@@ -44,8 +81,8 @@ static void draw_hands_recursive(GContext *ctx, GPoint center,
   
   // Recurse before drawing so that earlier branches appear on top
   if (depth < MAX_RECURSION_DEPTH) {
-    draw_hands_recursive(ctx, minute_point, local_minute_angle, radius * RECURSE_SCALE, depth + 1);
-    draw_hands_recursive(ctx, hour_point, local_hour_angle, radius * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive2(ctx, minute_point, local_minute_angle, radius * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive2(ctx, hour_point, local_hour_angle, radius * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
     
     // The initial hands get a thick border around them to make it easier to actually read the time
     #if defined(TAPER) && !defined(CIRCLES)
@@ -119,10 +156,17 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
   #endif
   
-  graphics_context_set_antialiased(ctx, true);
+  s_fractal_index = 0;
+  draw_hands_recursive(ctx, GPoint(0, 0), 0, MINUTE_HAND_LENGTH * HOUR_HAND_SCALE, MINUTE_HAND_LENGTH, 0);
+  
   graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
+  gpath_move_to(s_fractal_path, center);
+  gpath_draw_outline(ctx, s_fractal_path);
+
+  //graphics_context_set_antialiased(ctx, true);
+  //graphics_context_set_stroke_color(ctx, GColorWhite);
+  //graphics_context_set_fill_color(ctx, GColorWhite);
+  //draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
 }
 
 // --- Ticks --- //
@@ -185,9 +229,12 @@ static void init(void) {
   // Subscribe to ticks every second
   // Even though we only have a minute-hand, the fractal can move a lot with only small inputs
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
+  
+  s_fractal_path = gpath_create(&FRACTAL_PATH_INFO);
 }
 
 static void deinit(void) {
+  gpath_destroy(s_fractal_path);
   tick_timer_service_unsubscribe();
   window_destroy(s_window);
 }
