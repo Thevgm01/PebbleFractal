@@ -1,15 +1,15 @@
 #include <pebble.h>
 
-#define FASTMODE
+//#define FASTMODE
 
 //#define CIRCLES
 
 #define MINUTE_HAND_LENGTH 40
-#define HOUR_HAND_SCALE 7 / 10
+#define HOUR_HAND_SCALE 6 / 10
 #define THICKNESS_MULT 1 / 2
 #define TRUE_HAND_LENGTH 100
 
-#define MAX_RECURSION_DEPTH 7
+#define MAX_RECURSION_DEPTH 8
 #define RECURSE_SCALE 18 / 20
 
 // --- Static Variables --- //
@@ -122,6 +122,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
   
+  graphics_context_set_stroke_color(ctx, GColorGreen);
   graphics_draw_line(ctx, center, point_on_circle(center, s_minute_angle, TRUE_HAND_LENGTH));
   graphics_draw_line(ctx, center, point_on_circle(center, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
 }
@@ -143,7 +144,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
     GPoint outer = point_on_circle(center, angle, outer_r);
     GPoint inner = point_on_circle(center, angle, inner_r);
 
-    graphics_context_set_stroke_color(ctx, is_hour ? GColorLightGray : GColorDarkGray);
+    graphics_context_set_stroke_color(ctx, is_hour ? GColorGreen : GColorBrightGreen);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
     graphics_draw_line(ctx, inner, outer);
   }
