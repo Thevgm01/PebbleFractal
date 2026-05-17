@@ -1,6 +1,6 @@
 #include <pebble.h>
 
-//#define FASTMODE
+#define FASTMODE
 
 //#define CIRCLES
 
@@ -18,8 +18,11 @@ static Layer *s_fractal_layer;
 static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
 
-static int32_t s_hour_angle;
-static int32_t s_minute_angle;
+static int16_t s_hour_angle;
+static int16_t s_minute_angle;
+
+static int32_t s_average_pos_x;
+static int32_t s_average_pos_y;
 
 // --- Drawing Functions --- //
 
@@ -55,6 +58,10 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
   if (depth < MAX_RECURSION_DEPTH) {
     draw_hands_recursive(ctx, minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
     draw_hands_recursive(ctx, hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
+  }
+  else {
+    s_average_pos_x = s_average_pos_x + minute_point.x;
+    s_average_pos_y = s_average_pos_y + minute_point.y;
   }
   
   uint16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
@@ -117,14 +124,22 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   #endif
 
   // Draw fractal
+  s_average_pos_x = 0;
+  s_average_pos_y = 0;
   graphics_context_set_antialiased(ctx, true);
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
-  
+  s_average_pos_x >>= MAX_RECURSION_DEPTH;
+  s_average_pos_y >>= MAX_RECURSION_DEPTH;
+
   graphics_context_set_stroke_color(ctx, GColorGreen);
   graphics_draw_line(ctx, center, point_on_circle(center, s_minute_angle, TRUE_HAND_LENGTH));
   graphics_draw_line(ctx, center, point_on_circle(center, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
+  
+  graphics_context_set_stroke_color(ctx, GColorOrange);
+  graphics_draw_circle(ctx, (GPoint){ s_average_pos_x, s_average_pos_y }, 20);
+  printf("%d, %d", s_average_pos_x, s_average_pos_y);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
