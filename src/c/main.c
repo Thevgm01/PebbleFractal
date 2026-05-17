@@ -1,6 +1,6 @@
 #include <pebble.h>
 
-#define FASTMODE
+//#define FASTMODE
 
 //#define CIRCLES
 
@@ -20,9 +20,6 @@ static TextLayer *s_date_layer;
 
 static int16_t s_hour_angle;
 static int16_t s_minute_angle;
-
-static int32_t s_average_pos_x;
-static int32_t s_average_pos_y;
 
 // --- Drawing Functions --- //
 
@@ -58,10 +55,6 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
   if (depth < MAX_RECURSION_DEPTH) {
     draw_hands_recursive(ctx, minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
     draw_hands_recursive(ctx, hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
-  }
-  else {
-    s_average_pos_x = s_average_pos_x + minute_point.x;
-    s_average_pos_y = s_average_pos_y + minute_point.y;
   }
   
   uint16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
@@ -128,18 +121,10 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   #endif
 
   // Draw fractal
-  s_average_pos_x = 0;
-  s_average_pos_y = 0;
-  graphics_context_set_antialiased(ctx, true);
+  graphics_context_set_antialiased(ctx, false);
   graphics_context_set_stroke_width(ctx, 1);
-  graphics_context_set_stroke_color(ctx, GColorLightGray);
+  graphics_context_set_stroke_color(ctx, GColorDarkGray);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
-  s_average_pos_x >>= MAX_RECURSION_DEPTH;
-  s_average_pos_y >>= MAX_RECURSION_DEPTH;
-  
-  graphics_context_set_stroke_color(ctx, GColorOrange);
-  graphics_draw_circle(ctx, (GPoint){ s_average_pos_x, s_average_pos_y }, 20);
-  printf("%d, %d", s_average_pos_x, s_average_pos_y);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -171,11 +156,24 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   layer_mark_dirty(s_fractal_layer);
 
   // Update the date label once a minute (or on first load)
+  #ifndef FASTMODE
   if (units_changed & MINUTE_UNIT || units_changed & DAY_UNIT) {
+  #endif
     static char date_buf[16];
     strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
     text_layer_set_text(s_date_layer, date_buf);
+
+    GRect bounds = layer_get_bounds(s_notch_layer);
+    GPoint center = grect_center_point(&bounds);
+    layer_set_frame(
+      text_layer_get_layer(s_date_layer),
+      GRect(
+        sin_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 25 / TRIG_MAX_RATIO + center.x,
+        -cos_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 50 / TRIG_MAX_RATIO + center.y,
+        80, 20));
+  #ifndef FASTMODE  
   }
+  #endif
 }
 
 // --- Window --- //
@@ -198,7 +196,7 @@ static void window_load(Window *window) {
   GRect date_rect = GRect(bounds.size.w / 2, 104, 70, 20);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, GColorLightGray);
+  text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_font(s_date_layer,
   fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
