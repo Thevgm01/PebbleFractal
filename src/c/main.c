@@ -81,6 +81,14 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
       uint16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
       uint16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
       
+      // Draw a circle at the very center, and make the hands white
+      if (depth == 0) {
+        graphics_context_set_stroke_color(ctx, GColorWhite);
+        graphics_draw_circle(ctx, origin, half_width);
+        
+        graphics_draw_line(ctx, minute_point, point_on_circle(origin, s_minute_angle, TRUE_HAND_LENGTH));
+        graphics_draw_line(ctx, hour_point, point_on_circle(origin, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
+      }
       graphics_draw_line(ctx, // Left minute line
                          point_on_circle(origin, minute_normal_angle, half_width), 
                          point_on_circle(minute_point, minute_normal_angle, next_half_width));
@@ -94,10 +102,6 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
       
-      // Draw a circle at the very center
-      if (depth == 0) {
-        graphics_draw_circle(ctx, origin, half_width);
-      }
     }
   #endif
 }
@@ -128,14 +132,10 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   s_average_pos_y = 0;
   graphics_context_set_antialiased(ctx, true);
   graphics_context_set_stroke_width(ctx, 1);
-  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorLightGray);
   draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
   s_average_pos_x >>= MAX_RECURSION_DEPTH;
   s_average_pos_y >>= MAX_RECURSION_DEPTH;
-
-  graphics_context_set_stroke_color(ctx, GColorGreen);
-  graphics_draw_line(ctx, center, point_on_circle(center, s_minute_angle, TRUE_HAND_LENGTH));
-  graphics_draw_line(ctx, center, point_on_circle(center, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
   
   graphics_context_set_stroke_color(ctx, GColorOrange);
   graphics_draw_circle(ctx, (GPoint){ s_average_pos_x, s_average_pos_y }, 20);
@@ -159,7 +159,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
     GPoint outer = point_on_circle(center, angle, outer_r);
     GPoint inner = point_on_circle(center, angle, inner_r);
 
-    graphics_context_set_stroke_color(ctx, is_hour ? GColorGreen : GColorBrightGreen);
+    graphics_context_set_stroke_color(ctx, is_hour ? GColorWhite : GColorLightGray);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
     graphics_draw_line(ctx, inner, outer);
   }
