@@ -7,7 +7,7 @@
 #define MINUTE_HAND_LENGTH 40
 #define HOUR_HAND_SCALE 6 / 10
 #define THICKNESS_MULT 1 / 2
-#define TRUE_HAND_LENGTH 100
+#define TRUE_HAND_MULT 5 / 2
 
 #define MAX_RECURSION_DEPTH 8
 #define RECURSE_SCALE 18 / 20
@@ -79,8 +79,8 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin,
         graphics_context_set_stroke_color(ctx, GColorWhite);
         graphics_draw_circle(ctx, origin, half_width);
         
-        graphics_draw_line(ctx, minute_point, point_on_circle(origin, s_minute_angle, TRUE_HAND_LENGTH));
-        graphics_draw_line(ctx, hour_point, point_on_circle(origin, s_hour_angle, TRUE_HAND_LENGTH * HOUR_HAND_SCALE));
+        graphics_draw_line(ctx, minute_point, point_on_circle(origin, s_minute_angle, MINUTE_HAND_LENGTH * TRUE_HAND_MULT));
+        graphics_draw_line(ctx, hour_point, point_on_circle(origin, s_hour_angle, MINUTE_HAND_LENGTH * TRUE_HAND_MULT * HOUR_HAND_SCALE));
       }
       graphics_draw_line(ctx, // Left minute line
                          point_on_circle(origin, minute_normal_angle, half_width), 
@@ -153,12 +153,14 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 // --- Ticks --- //
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Redraw the fractal every second
+  #ifndef FASTMODE
+  if (tick_time->tm_sec % 5 != 0) return;
+  #endif
+  
   layer_mark_dirty(s_fractal_layer);
 
   // Update the date label once a minute (or on first load)
-  #ifndef FASTMODE
   if (units_changed & MINUTE_UNIT || units_changed & DAY_UNIT) {
-  #endif
     static char date_buf[16];
     strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
     text_layer_set_text(s_date_layer, date_buf);
@@ -171,9 +173,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
         sin_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 25 / TRIG_MAX_RATIO + center.x,
         -cos_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 50 / TRIG_MAX_RATIO + center.y,
         80, 20));
-  #ifndef FASTMODE  
   }
-  #endif
 }
 
 // --- Window --- //
