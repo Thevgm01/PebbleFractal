@@ -6,11 +6,11 @@
 
 #define MINUTE_HAND_LENGTH 40
 #define HOUR_HAND_SCALE 6 / 10
-#define THICKNESS_MULT 1 / 2
+#define THICKNESS_MULT 2 / 5
 #define TRUE_HAND_MULT 5 / 2
 
-#define MAX_RECURSION_DEPTH 8
-#define RECURSE_SCALE 18 / 20
+#define MAX_RECURSION_DEPTH 9
+#define RECURSE_SCALE 17 / 20
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -73,8 +73,7 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
     if (half_width <= 1) {
       graphics_draw_line(ctx, origin, minute_point);
       graphics_draw_line(ctx, origin, hour_point);
-    }
-    else {
+    } else {
       int16_t next_half_width = half_width - 1;
       int16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
       int16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
@@ -163,6 +162,8 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+// --- Animation --- //
+
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
   s_max_depth = progress * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
   s_length_mult_for_max_depth = progress - (s_max_depth * (ANIMATION_NORMALIZED_MAX + 1) / MAX_RECURSION_DEPTH);
@@ -175,8 +176,19 @@ static void animation_stopped_proc(Animation *animation, bool finished, void *co
 static AnimationImplementation s_animation_impl = {
   .update = animation_update_proc,
 };
+static void start_animation() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Starting animation");
+  if (s_animation) animation_destroy(s_animation);
+  s_animation = animation_create();
+  animation_set_implementation(s_animation, &s_animation_impl);
+  animation_set_handlers(s_animation, (AnimationHandlers) { .stopped = animation_stopped_proc }, NULL);
+  animation_set_duration(s_animation, 2000);
+  animation_set_curve(s_animation, AnimationCurveLinear);
+  animation_schedule(s_animation);
+}
 
 // --- Ticks --- //
+
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Redraw the fractal every second
   #ifndef FASTMODE
@@ -203,6 +215,17 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 // --- Window --- //
+
+static void focus_handler(bool focus) {
+  if (focus) {
+    start_animation();
+  } else {
+    s_max_depth = 0;
+    s_length_mult_for_max_depth = 0;
+    layer_mark_dirty(s_fractal_layer);
+  }
+}
+
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
@@ -235,28 +258,22 @@ static void window_load(Window *window) {
   strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
   text_layer_set_text(s_date_layer, date_buf);
   
-  // Start the animation
-  if (s_animation) {
-    animation_destroy(s_animation);
-  }
-  s_animation = animation_create();
-  animation_set_implementation(s_animation, &s_animation_impl);
-  animation_set_handlers(s_animation, (AnimationHandlers) { .stopped = animation_stopped_proc }, NULL);
-  animation_set_duration(s_animation, 2000);
-  animation_set_curve(s_animation, AnimationCurveLinear);
-  animation_schedule(s_animation);
+  // Animation stuff
+  app_focus_service_subscribe_handlers((AppFocusHandlers) {
+    .did_focus = focus_handler
+  });
 }
 
 static void window_unload(Window *window) {
   layer_destroy(s_fractal_layer);
   layer_destroy(s_notch_layer);
   text_layer_destroy(s_date_layer);
-  if (s_animation) {
-    animation_destroy(s_animation);
-  }
+  if (s_animation) animation_destroy(s_animation);
+  app_focus_service_unsubscribe();
 }
 
 // --- Initialization --- //
+
 static void init(void) {
   s_window = window_create();
   window_set_background_color(s_window, GColorBlack);
