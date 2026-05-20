@@ -5,13 +5,13 @@
 
 //#define CIRCLES
 
-#define MINUTE_HAND_LENGTH 40
+#define MINUTE_HAND_LENGTH 70
+#define TRUE_HAND_MULT 0 / 3
 #define HOUR_HAND_SCALE 6 / 10
-#define THICKNESS_MULT 2 / 5
-#define TRUE_HAND_MULT 5 / 2
+#define THICKNESS_MULT 3 / 8
 
-#define MAX_RECURSION_DEPTH 9
-#define RECURSE_SCALE 17 / 20
+#define MAX_RECURSION_DEPTH 12
+#define RECURSE_SCALE 15 / 20
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -85,7 +85,7 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
         graphics_draw_circle(ctx, origin, half_width);
         
         // Draw additional long lines for the true hands
-        if (s_max_depth >= 1) {
+        if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
           int16_t true_hand_length = MINUTE_HAND_LENGTH * TRUE_HAND_MULT - MINUTE_HAND_LENGTH;
           if (s_max_depth == 1) {
             true_hand_length = true_hand_length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
