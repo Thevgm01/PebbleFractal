@@ -1,6 +1,7 @@
 #include <pebble.h>
 
-//#define FASTMODE
+#define FASTMODE
+#define RANDOM
 
 //#define CIRCLES
 
@@ -124,12 +125,18 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
 
-  // Convert to angle  
-  s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
-  s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
-  #ifdef FASTMODE
-  s_hour_angle = s_minute_angle;
-  s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
+  // Convert to angle
+  #ifdef RANDOM
+    srand(now);
+    s_hour_angle = rand() % TRIG_MAX_ANGLE;
+    s_minute_angle = rand() % TRIG_MAX_ANGLE;
+  #else
+    s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
+    s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
+    #ifdef FASTMODE
+      s_hour_angle = s_minute_angle;
+      s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
+    #endif
   #endif
 
   // Draw fractal
