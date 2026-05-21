@@ -1,17 +1,18 @@
 #include <pebble.h>
+#include "screen_cells.h"
 
-#define FASTMODE
-#define RANDOM
+//#define FASTMODE
+//#define RANDOM
 
 //#define CIRCLES
 
-#define MINUTE_HAND_LENGTH 70
+#define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 0 / 3
-#define HOUR_HAND_SCALE 6 / 10
+#define HOUR_HAND_SCALE 7 / 10
 #define THICKNESS_MULT 3 / 8
 
 #define MAX_RECURSION_DEPTH 12
-#define RECURSE_SCALE 15 / 20
+#define RECURSE_SCALE 16 / 20
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -25,6 +26,7 @@ static int16_t s_length_mult_for_max_depth;
 
 static int16_t s_hour_angle;
 static int16_t s_minute_angle;
+static GContext *s_fractal_ctx;
 
 // --- Drawing Functions --- //
 
@@ -47,7 +49,9 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
   return (angle1 + angle2) % TRIG_MAX_ANGLE;
 }
 
-static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {  
+static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
+  if (length == 0) return;
+  
   // Figure out where my hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int16_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
@@ -59,8 +63,8 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
 
   // Recurse before drawing so that earlier branches appear on top
   if (depth < s_max_depth) {
-    draw_hands_recursive(ctx, minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
-    draw_hands_recursive(ctx, hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive(minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
   }
   
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
@@ -70,10 +74,21 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
     graphics_draw_circle(ctx, minute_point, half_width);
     graphics_draw_circle(ctx, hour_point, half_width);
   #else
-    // If the lines are too thin, just draw them as individual lines
+    // If the hands are too thin, just draw them as individual lines
     if (half_width <= 1) {
-      graphics_draw_line(ctx, origin, minute_point);
-      graphics_draw_line(ctx, origin, hour_point);
+      // Make the hands white, for the uppermost hands
+      if (depth == 0) {
+        graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+        graphics_draw_circle(s_fractal_ctx, origin, half_width);
+      }
+      
+      if (length == 1) { // And if they're too short, draw them as points
+        graphics_draw_pixel(s_fractal_ctx, minute_point);
+        graphics_draw_pixel(s_fractal_ctx, hour_point);
+      } else {
+        graphics_draw_line(s_fractal_ctx, origin, minute_point);
+        graphics_draw_line(s_fractal_ctx, origin, hour_point);
+      }
     } else {
       int16_t next_half_width = half_width - 1;
       int16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
@@ -81,8 +96,8 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
       
       // Draw a circle at the very center, and make the hands white, for the uppermost hands
       if (depth == 0) {
-        graphics_context_set_stroke_color(ctx, GColorWhite);
-        graphics_draw_circle(ctx, origin, half_width);
+        graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+        graphics_draw_circle(s_fractal_ctx, origin, half_width);
         
         // Draw additional long lines for the true hands
         if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
@@ -90,21 +105,21 @@ static void draw_hands_recursive(GContext *ctx, GPoint origin, int16_t base_angl
           if (s_max_depth == 1) {
             true_hand_length = true_hand_length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
           }
-          graphics_draw_line(ctx, minute_point, point_on_circle(origin, s_minute_angle, length + true_hand_length));
-          graphics_draw_line(ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
+          graphics_draw_line(s_fractal_ctx, minute_point, point_on_circle(origin, s_minute_angle, length + true_hand_length));
+          graphics_draw_line(s_fractal_ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
         }
       }
       // Draw the sides of the clock hands
-      graphics_draw_line(ctx, // Left minute line
+      graphics_draw_line(s_fractal_ctx, // Left minute line
                          point_on_circle(origin, minute_normal_angle, half_width), 
                          point_on_circle(minute_point, minute_normal_angle, next_half_width));
-      graphics_draw_line(ctx, // Right minute line
+      graphics_draw_line(s_fractal_ctx, // Right minute line
                          point_on_circle(origin, minute_normal_angle, -half_width), 
                          point_on_circle(minute_point, minute_normal_angle, -next_half_width));
-      graphics_draw_line(ctx, // Left hour line
+      graphics_draw_line(s_fractal_ctx, // Left hour line
                          point_on_circle(origin, hour_normal_angle, half_width), 
                          point_on_circle(hour_point, hour_normal_angle, next_half_width));
-      graphics_draw_line(ctx, // Right hour line
+      graphics_draw_line(s_fractal_ctx, // Right hour line
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
       
@@ -140,10 +155,11 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   #endif
 
   // Draw fractal
+  s_fractal_ctx = ctx;
   graphics_context_set_antialiased(ctx, false);
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
-  draw_hands_recursive(ctx, center, 0, MINUTE_HAND_LENGTH, 0);
+  draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
