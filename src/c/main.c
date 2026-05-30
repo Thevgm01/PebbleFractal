@@ -1,7 +1,7 @@
 #include <pebble.h>
 #include "screen_cells.h"
 
-#define FASTMODE
+//#define FASTMODE
 //#define RANDOM
 
 //#define CIRCLES
@@ -38,29 +38,15 @@ static GPoint add_GPoints(GPoint a, GPoint b) {
   return (GPoint){ .x = a.x + b.x, .y = a.y + b.y };
 }
 
-static int16_t add_angles2(int16_t angle1, int16_t angle2) {
-  return (angle1 + angle2) % TRIG_MAX_ANGLE;
-}
-
-static void draw_thick_line(GPoint origin, GPoint endpoint, int16_t angle, int8_t thickness) {    
-  if (thickness > 1) {
-    int16_t r_angle = add_angles2(angle, TRIG_MAX_ANGLE / 2);
-    int16_t r_sin = sin_lookup(r_angle);
-    int16_t r_cos = -cos_lookup(r_angle);
-    for (int8_t i = 0; i < thickness; i++) {
-      GPoint offset = (GPoint){ r_sin * i / TRIG_MAX_RATIO, r_cos* i / TRIG_MAX_RATIO };
-      graphics_draw_line(s_fractal_ctx, add_GPoints(origin, offset), add_GPoints(endpoint, offset));
-    }
-  } else {
-    graphics_draw_line(s_fractal_ctx, origin, endpoint);
-  }
-}
-
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
   return add_to_GPoint(origin,
      sin_lookup(angle) * radius / TRIG_MAX_RATIO,
     -cos_lookup(angle) * radius / TRIG_MAX_RATIO);
+}
+
+static int32_t add_angles2(int16_t angle1, int16_t angle2) {
+  return (angle1 + angle2) % TRIG_MAX_ANGLE;
 }
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
@@ -81,13 +67,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
   }
   
-  int8_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
-  int8_t width = 5;
-  
-  draw_thick_line(origin, minute_point, new_minute_angle, width);
-  draw_thick_line(origin, hour_point, new_hour_angle, width);
-
-  return;
+  int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
   
   #ifdef CIRCLES
     graphics_context_set_stroke_width(ctx, 1);
@@ -129,7 +109,6 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
           graphics_draw_line(s_fractal_ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
         }
       }
-      
       // Draw the sides of the clock hands
       graphics_draw_line(s_fractal_ctx, // Left minute line
                          point_on_circle(origin, minute_normal_angle, half_width), 
