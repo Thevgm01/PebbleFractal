@@ -54,7 +54,7 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
   if (length == 0) return;
   
-  cells_mark_occupied(&origin);
+  cells_mark_occupied(origin);
   
   // Figure out where my hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
@@ -171,6 +171,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
+  cells_update_largest_rect();
   cells_debug_draw(ctx, GColorRed, GColorGreen);
 }
 
@@ -277,7 +278,7 @@ static void window_load(Window *window) {
   layer_set_update_proc(s_notch_layer, notch_update_proc);
   layer_add_child(root, s_notch_layer);
 
-  cells_init(&center, min_dim, 10);
+  cells_init(center, min_dim, 10);
   
   // Date label — positioned at the 3 o'clock area (right of center)
   // Pebble Time 2 center is (100, 114); 3 o'clock sits ~ x=148
