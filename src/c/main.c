@@ -1,7 +1,7 @@
 #include <pebble.h>
-#include "screen_cells.h"
+#include "cells.h"
 
-//#define FASTMODE
+#define FASTMODE
 //#define RANDOM
 
 //#define CIRCLES
@@ -9,10 +9,12 @@
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 0 / 3
 #define HOUR_HAND_SCALE 7 / 10
-#define THICKNESS_MULT 3 / 8
+#define THICKNESS_MULT 0 / 8
 
 #define MAX_RECURSION_DEPTH 12
 #define RECURSE_SCALE 16 / 20
+
+#define min(a, b) a < b ? a : b
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -51,6 +53,8 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
   if (length == 0) return;
+  
+  cells_mark_occupied(&origin);
   
   // Figure out where my hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
@@ -98,6 +102,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
       if (depth == 0) {
         graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
         graphics_draw_circle(s_fractal_ctx, origin, half_width);
+        graphics_context_set_antialiased(s_fractal_ctx, true);
+        graphics_context_set_stroke_width(s_fractal_ctx, 3);
         
         // Draw additional long lines for the true hands
         if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
@@ -108,6 +114,9 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
           graphics_draw_line(s_fractal_ctx, minute_point, point_on_circle(origin, s_minute_angle, length + true_hand_length));
           graphics_draw_line(s_fractal_ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
         }
+        
+        graphics_context_set_stroke_width(s_fractal_ctx, 1);
+        graphics_context_set_antialiased(s_fractal_ctx, false);
       }
       // Draw the sides of the clock hands
       graphics_draw_line(s_fractal_ctx, // Left minute line
@@ -122,7 +131,6 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
       graphics_draw_line(s_fractal_ctx, // Right hour line
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
-      
     }
   #endif
 }
@@ -154,12 +162,16 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     #endif
   #endif
 
+  cells_reset();
+  
   // Draw fractal
   s_fractal_ctx = ctx;
   graphics_context_set_antialiased(ctx, false);
   graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
+  
+  cells_debug_draw(ctx, GColorRed, GColorGreen);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -252,6 +264,8 @@ static void focus_handler(bool focus) {
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
+  GPoint center = grect_center_point(&bounds);
+  int16_t min_dim = min(bounds.size.w, bounds.size.h);
 
   // Fractal layer
   s_fractal_layer = layer_create(bounds);
@@ -263,6 +277,8 @@ static void window_load(Window *window) {
   layer_set_update_proc(s_notch_layer, notch_update_proc);
   layer_add_child(root, s_notch_layer);
 
+  cells_init(&center, min_dim, 10);
+  
   // Date label — positioned at the 3 o'clock area (right of center)
   // Pebble Time 2 center is (100, 114); 3 o'clock sits ~ x=148
   GRect date_rect = GRect(bounds.size.w / 2, 104, 70, 20);
