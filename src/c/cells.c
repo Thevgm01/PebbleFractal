@@ -89,9 +89,9 @@ void cells_update_largest_rect() {
   int16_t histogram[SIZE] = {0};
   cells_largest_rect = GRectZero;
   
-  for (int16_t y = 0; y < SIZE; y++) {
+  for (int16_t y = SIZE - 1; y >= 0; y--) {
     for (int16_t x = 0; x < SIZE; x++) {
-      histogram[x] = (grid[y] & (LARGEST_BIT >> x)) > 0 ? 0 : histogram[x] + 1;
+      histogram[x] = (grid[y] & (1 << x)) > 0 ? 0 : histogram[x] + 1;
     }
     
     GRect possible_answer = compute_histogram_rect(histogram, y);
@@ -99,8 +99,6 @@ void cells_update_largest_rect() {
       cells_largest_rect = possible_answer;
     }
   }
-  
-  //cells_largest_rect.origin.x = SIZE - cells_largest_rect.origin.x;
   
   APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d, w: %d, h: %d", 
           cells_largest_rect.origin.x, cells_largest_rect.origin.y,
