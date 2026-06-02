@@ -1,27 +1,69 @@
 #include <pebble.h>
 #include "cells.h"
 
-#define SIZE 16
-const int16_t LARGEST_BIT = (1 << (SIZE - 1));
-static int16_t grid[SIZE]; // 16x16
+#define BITS 16
+int16_t grid[BITS]; // 16x16
+int16_t default_grid[BITS] = {
+#ifdef PBL_ROUND
+  0b1111100000011111,
+  0b1110000000000111,
+  0b1100000000000011,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b0000000000000000,
+  0b0000000000000000,
+  0b0000000110000000,
+  0b0000000110000000,
+  0b0000000000000000,
+  0b0000000000000000,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b1100000000000011,
+  0b1110000000000111,
+  0b1111100000011111,
+#else
+  0b1111100000011111,
+  0b1100000000000011,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b0000000000000000,
+  0b0000000000000000,
+  0b0000000110000000,
+  0b0000000110000000,
+  0b0000000000000000,
+  0b0000000000000000,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b1000000000000001,
+  0b1100000000000011,
+  0b1111100000011111,
+#endif
+};
 
 static GRect region;
+
+int16_t histogram_stack[BITS]; // No need to initialize
+int16_t histogram_stack_count = 0;
+void histogram_stack_push(int16_t value) { histogram_stack[histogram_stack_count++] = value; }
+int16_t histogram_stack_pop() { return histogram_stack[--histogram_stack_count]; }
+int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_count - 1]; }
 
 void cells_init(GPoint center, int16_t min_dim, int16_t inset) {
   region = grect_crop(GRect(center.x - min_dim / 2, center.y - min_dim / 2, min_dim, min_dim), inset);
 }
 
 void cells_reset() {
-  for (int16_t i = 0; i < SIZE; i++) {
-    grid[i] = 0;
+  for (int16_t i = 0; i < BITS; i++) {
+    grid[i] = default_grid[i];
   }
 }
 
 void cells_mark_occupied(GPoint pos) {
-  int16_t y = (pos.y - region.origin.y) * SIZE / region.size.h;
-  if (y >= 0 && y < SIZE) {
-    int16_t x = (pos.x - region.origin.x) * SIZE / region.size.w;
-    if (x >= 0 && x < SIZE) {
+  int16_t y = (pos.y - region.origin.y) * BITS / region.size.h;
+  if (y >= 0 && y < BITS) {
+    int16_t x = (pos.x - region.origin.x) * BITS / region.size.w;
+    if (x >= 0 && x < BITS) {
       grid[y] |= 1 << x;
     }
   }
@@ -32,75 +74,77 @@ bool is_cell_filled(int16_t x, int16_t y) {
 }
 
 void cells_debug_draw(GContext *ctx, GColor filled_color, GColor empty_color) {
-  for (int y = 0; y < SIZE; y++) {
-    for (int x = 0; x < SIZE; x++) {
+  for (int y = 0; y < BITS; y++) {
+    for (int x = 0; x < BITS; x++) {
       graphics_context_set_stroke_color(ctx, is_cell_filled(x, y) ? filled_color : empty_color);
       graphics_draw_pixel(ctx, GPoint(
-        region.origin.x + (2 * x + 1) * region.size.w / SIZE / 2,
-        region.origin.y + (2 * y + 1) * region.size.h / SIZE / 2));
+        region.origin.x + (2 * x + 1) * region.size.w / BITS / 2,
+        region.origin.y + (2 * y + 1) * region.size.h / BITS / 2));
     }
   }
-  GRect visual = GRect(cells_largest_rect.origin.x * region.size.w / SIZE + region.origin.x,
-                       cells_largest_rect.origin.y * region.size.w / SIZE + region.origin.y,
-                       cells_largest_rect.size.w * region.size.w / SIZE,
-                       cells_largest_rect.size.h * region.size.w / SIZE);
+  GRect visual = GRect(cells_largest_rect.origin.x * region.size.w / BITS + region.origin.x,
+                       cells_largest_rect.origin.y * region.size.w / BITS + region.origin.y,
+                       cells_largest_rect.size.w * region.size.w / BITS,
+                       cells_largest_rect.size.h * region.size.w / BITS);
   graphics_context_set_stroke_color(ctx, GColorOrange);
   graphics_draw_rect(ctx, visual);
 }
 
-// True if a > b
-bool gsize_larger(GSize a, GSize b) {
-  return a.w * a.h > b.w * b.h;
+// Slightly prefer wider rects
+int16_t gsize_score(GSize size) {
+  return (size.w - 2) * size.h;
 }
 
-// https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/
-GRect compute_histogram_rect(int16_t histogram[], int16_t y) {
-  int16_t stack[SIZE] = {0};
-  int16_t stack_idx = -1;
+// True if a > b
+// Enforce minimum width and height
+bool gsize_larger(GSize a, GSize b) {
+  return a.w >= 6 && a.h >= 2 && gsize_score(a) > gsize_score(b);
+}
+
+GRect compute_histogram_rect(int16_t histogram[], int16_t y) {  
   GRect result = GRectZero;
   
-  for (int16_t i = 0; i < SIZE; i++) {
-    while (stack_idx >= 0 && histogram[stack[stack_idx]] >= histogram[i]) {
-      int16_t top_idx = stack[stack_idx--]; // Pop
-      int16_t width = stack_idx < 0 ? i : i - stack[stack_idx] - 1;
-      GSize size = GSize(width, histogram[top_idx]);
-      if (gsize_larger(size, result.size)) {
-        int16_t x = stack_idx < 0 ? 0 : stack[stack_idx] + 1;
-        result = GRect(x, y, size.w, size.h);
-      }
-    }
-    stack[++stack_idx] = i; // Push
-  }
-  
-  while (stack_idx >= 0) {
-    int16_t top_idx = stack[stack_idx--]; // Pop
-    int16_t width = stack_idx < 0 ? SIZE : SIZE - stack[stack_idx] - 1;
-    GSize size = GSize(width, histogram[top_idx]);
+  // Seems like nested functions aren't allowed except under cetain compilers?
+  // Appears to work fine for Pebble, and it saves several lines
+  // Apologies if it's uncouth behavior or something, I'm a C# guy usually
+  void check_next_rect(int16_t index) {
+    int16_t prev_hist_value = histogram[histogram_stack_pop()];
+    int16_t width = histogram_stack_count == 0 ? index : index - histogram_stack_peek() - 1;
+    GSize size = GSize(width, prev_hist_value);
     if (gsize_larger(size, result.size)) {
-      int16_t x = stack_idx < 0 ? 0 : stack[stack_idx] + 1;
+      int16_t x = histogram_stack_count == 0 ? 0 : histogram_stack_peek() + 1;
       result = GRect(x, y, size.w, size.h);
     }
+  }
+  
+  // Go through histogram
+  for (int16_t i = 0; i < BITS; i++) {
+    while (histogram_stack_count > 0 && histogram[histogram_stack_peek()] >= histogram[i]) {
+      check_next_rect(i);
+    }
+    histogram_stack_push(i);
+  }
+  
+  // Pop remaining
+  while (histogram_stack_count > 0) {
+    check_next_rect(BITS);
   }
   
   return result;
 }
 
 void cells_update_largest_rect() {
-  int16_t histogram[SIZE] = {0};
+  int16_t histogram[BITS] = {0};
   cells_largest_rect = GRectZero;
   
-  for (int16_t y = SIZE - 1; y >= 0; y--) {
-    for (int16_t x = 0; x < SIZE; x++) {
+  for (int16_t y = BITS - 1; y >= 0; y--) {
+    for (int16_t x = 0; x < BITS; x++) {
       histogram[x] = (grid[y] & (1 << x)) > 0 ? 0 : histogram[x] + 1;
     }
     
-    GRect possible_answer = compute_histogram_rect(histogram, y);
-    if (gsize_larger(possible_answer.size, cells_largest_rect.size)) {
-      cells_largest_rect = possible_answer;
+    GRect possible_largest = compute_histogram_rect(histogram, y);
+    if (gsize_larger(possible_largest.size, cells_largest_rect.size)) {
+      cells_largest_rect = possible_largest;
     }
   }
-  
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d, w: %d, h: %d", 
-          cells_largest_rect.origin.x, cells_largest_rect.origin.y,
-          cells_largest_rect.size.w, cells_largest_rect.size.h);
 }
