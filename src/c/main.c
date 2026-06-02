@@ -137,14 +137,9 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   #endif
 }
 
-// Gets called on tick
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
-
-  // Background
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   
   // Current time
   time_t now = time(NULL);
@@ -172,6 +167,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
   #ifdef DRAW_GRID
+    cells_update_largest_rect();
     cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
   #endif
 }
@@ -204,7 +200,9 @@ static void date_update_proc(Layer *layer, GContext *ctx) {
   struct tm* t = localtime(&now);
   
   s_move_date = false;
-  cells_update_largest_rect();
+  #ifndef DRAW_GRID
+    cells_update_largest_rect();
+  #endif
   
   static char date_buf[16];
   strftime(date_buf, sizeof(date_buf), "%a %b %d", t); // Mon Jun 01
