@@ -15,7 +15,7 @@
 #define MAX_RECURSION_DEPTH 12
 #define RECURSE_SCALE 16 / 20
 
-#define min(a, b) a < b ? a : b
+#define min(a, b) (a < b ? a : b)
 
 // --- Static Variables --- //
 static Window *s_window;
