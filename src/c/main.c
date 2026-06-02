@@ -5,6 +5,7 @@
 //#define RANDOM
 
 //#define CIRCLES
+#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 0 / 3
@@ -30,19 +31,19 @@ static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 
+static bool s_move_date;
+
 // --- Drawing Functions --- //
 
-static GPoint add_to_GPoint(GPoint a, int16_t x, int16_t y) {
-  return (GPoint){ .x = a.x + x, .y = a.y + y };
-}
-
-static GPoint add_GPoints(GPoint a, GPoint b) {
-  return (GPoint){ .x = a.x + b.x, .y = a.y + b.y };
-}
+static GPoint add_to_gpoint(GPoint a, int16_t x, int16_t y) { return GPoint(a.x + x, a.y + y); }
+static GPoint add_gpoints(GPoint a, GPoint b) { return GPoint(a.x + b.x, a.y + b.y); }
+static GPoint sub_gpoints(GPoint a, GPoint b) { return GPoint(a.x - b.x, a.y - b.y); }
+static GPoint center_rect_in_rect(GRect child, GRect parent) {
+  return sub_gpoints(grect_center_point(&parent), grect_center_point(&child)); }
 
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
-  return add_to_GPoint(origin,
+  return add_to_gpoint(origin,
      sin_lookup(angle) * radius / TRIG_MAX_RATIO,
     -cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 }
@@ -52,16 +53,20 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 }
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
+  // Animate the length per depth
+  if (depth == s_max_depth) {
+    length *= s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
+  }
+  
+  // Early return if our length is zero (nothing to draw)
   if (length == 0) return;
   
-  cells_mark_occupied(origin);
+  // Mark our origin point occupied for determining the date placement
+  if (s_move_date) cells_mark_occupied(origin);
   
-  // Figure out where my hands should be pointing
+  // Figure out where our hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int16_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
-  if (depth == s_max_depth) {
-    length = length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
-  }
   GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
   GPoint hour_point = point_on_circle(origin, new_hour_angle, length * HOUR_HAND_SCALE);
 
@@ -71,39 +76,39 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
   }
   
+  // Determine line width (can be zero)
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
   
-  #ifdef CIRCLES
-    graphics_context_set_stroke_width(ctx, 1);
-    graphics_draw_circle(ctx, minute_point, half_width);
-    graphics_draw_circle(ctx, hour_point, half_width);
-  #else
-    // If the hands are too thin, just draw them as individual lines
-    if (half_width <= 1) {
-      // Make the hands white, for the uppermost hands
-      if (depth == 0) {
-        graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
-        graphics_draw_circle(s_fractal_ctx, origin, half_width);
-      }
-      
-      if (length == 1) { // And if they're too short, draw them as points
-        graphics_draw_pixel(s_fractal_ctx, minute_point);
-        graphics_draw_pixel(s_fractal_ctx, hour_point);
-      } else {
+  // Make the hands white for the uppermost layer
+  if (depth == 0) graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+  // Don't need to set back to gray because the uppermost layers are drawn last
+  
+  #ifdef CIRCLES // Draw circles
+    if (half_width > 1) {
+      graphics_draw_circle(ctx, minute_point, half_width);
+      graphics_draw_circle(ctx, hour_point, half_width);
+    } else {
+      graphics_draw_pixel(ctx, minute_point);
+      graphics_draw_pixel(ctx, hour_point);
+    }
+  #else // Draw lines
+    if (half_width <= 1) { // Hands are thin, draw them as individual lines
+      if (length > 1) {
         graphics_draw_line(s_fractal_ctx, origin, minute_point);
         graphics_draw_line(s_fractal_ctx, origin, hour_point);
+      } else {
+        // If they're too short, draw points instead of lines
+        graphics_draw_pixel(s_fractal_ctx, minute_point);
+        graphics_draw_pixel(s_fractal_ctx, hour_point);
       }
-    } else {
+    } else { // Hands are thick, draw two lines on either side
       int16_t next_half_width = half_width - 1;
       int16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
       int16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
       
-      // Draw a circle at the very center, and make the hands white, for the uppermost hands
       if (depth == 0) {
-        graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+        // Draw a circle at the very center
         graphics_draw_circle(s_fractal_ctx, origin, half_width);
-        graphics_context_set_antialiased(s_fractal_ctx, true);
-        graphics_context_set_stroke_width(s_fractal_ctx, 3);
         
         // Draw additional long lines for the true hands
         if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
@@ -114,9 +119,6 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
           graphics_draw_line(s_fractal_ctx, minute_point, point_on_circle(origin, s_minute_angle, length + true_hand_length));
           graphics_draw_line(s_fractal_ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
         }
-        
-        graphics_context_set_stroke_width(s_fractal_ctx, 1);
-        graphics_context_set_antialiased(s_fractal_ctx, false);
       }
       // Draw the sides of the clock hands
       graphics_draw_line(s_fractal_ctx, // Left minute line
@@ -161,8 +163,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
     #endif
   #endif
-
-  cells_reset();
   
   // Draw fractal
   s_fractal_ctx = ctx;
@@ -171,8 +171,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
-  cells_update_largest_rect();
-  cells_debug_draw(ctx, GColorRed, GColorGreen);
+  #ifdef DRAW_GRID
+    cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
+  #endif
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -180,22 +181,43 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   GPoint center = grect_center_point(&bounds);
   GSize size = bounds.size;
   
-  int16_t min_bound = (size.w < size.h ? size.w : size.h) / 2;
+  int16_t radius = min(size.w, size.h) / 2;
   int16_t squircleish_offsets[] = {0, 1, 2, 4, 7, 11, 15, 15, 15, 11, 7, 4, 2, 1, 0};
   
   // Tick marks
   for (int8_t i = 0; i < 60; i++) {
-    int16_t angle = TRIG_MAX_ANGLE * i / 60;
+    int16_t angle = i * TRIG_MAX_ANGLE / 60;
     bool is_hour = (i % 5 == 0);
-    int16_t outer_r = min_bound + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
+    int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
     int16_t inner_r = outer_r - (is_hour ? 12 : 5);
-    GPoint outer = point_on_circle(center, angle, outer_r);
-    GPoint inner = point_on_circle(center, angle, inner_r);
 
     graphics_context_set_stroke_color(ctx, is_hour ? GColorWhite : GColorLightGray);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
-    graphics_draw_line(ctx, inner, outer);
+    graphics_draw_line(ctx,
+                       point_on_circle(center, angle, inner_r),
+                       point_on_circle(center, angle, outer_r));
   }
+}
+
+static void date_update_proc(Layer *layer, GContext *ctx) {
+  time_t now = time(NULL);
+  struct tm* t = localtime(&now);
+  
+  s_move_date = false;
+  cells_update_largest_rect();
+  
+  static char date_buf[16];
+  strftime(date_buf, sizeof(date_buf), "%a %b %d", t); // Mon Jun 01
+  text_layer_set_text(s_date_layer, date_buf);
+
+  GRect bounds = layer_get_bounds(s_notch_layer);
+  GPoint center = grect_center_point(&bounds);
+  layer_set_frame(
+    text_layer_get_layer(s_date_layer),
+    GRect(
+      sin_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 25 / TRIG_MAX_RATIO + center.x,
+      -cos_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 50 / TRIG_MAX_RATIO + center.y,
+      80, 20));
 }
 
 // --- Animation --- //
@@ -207,11 +229,10 @@ static void animation_update_proc(Animation *animation, const AnimationProgress 
   layer_mark_dirty(s_fractal_layer);
 }
 static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
+  s_max_depth = MAX_RECURSION_DEPTH + 1;
   s_animation = NULL;
 }
-static AnimationImplementation s_animation_impl = {
-  .update = animation_update_proc,
-};
+static AnimationImplementation s_animation_impl = { .update = animation_update_proc };
 static void start_animation() {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Starting animation");
   if (s_animation) animation_destroy(s_animation);
@@ -226,28 +247,24 @@ static void start_animation() {
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  // Redraw the fractal every second
-  #ifndef FASTMODE
-  if (tick_time->tm_sec % 5 != 0) return;
+  #ifdef FASTMODE
+    s_move_date = true;
+    cells_reset();
+    layer_mark_dirty(s_fractal_layer);
+    layer_mark_dirty(text_layer_get_layer(s_date_layer));
+  #else
+    if (tick_time->tm_sec % 5 == 0) {
+      // Redraw the fractal every 5 seconds
+      layer_mark_dirty(s_fractal_layer);
+
+      // Update the date label once a minute (or on first load)
+      if ((units_changed & (MINUTE_UNIT | DAY_UNIT)) > 0) {
+        s_move_date = true;
+        cells_reset();
+        layer_mark_dirty(text_layer_get_layer(s_date_layer));
+      }
+    }
   #endif
-  
-  layer_mark_dirty(s_fractal_layer);
-
-  // Update the date label once a minute (or on first load)
-  if (units_changed & MINUTE_UNIT || units_changed & DAY_UNIT) {
-    static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
-    text_layer_set_text(s_date_layer, date_buf);
-
-    GRect bounds = layer_get_bounds(s_notch_layer);
-    GPoint center = grect_center_point(&bounds);
-    layer_set_frame(
-      text_layer_get_layer(s_date_layer),
-      GRect(
-        sin_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 25 / TRIG_MAX_RATIO + center.x,
-        -cos_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 50 / TRIG_MAX_RATIO + center.y,
-        80, 20));
-  }
 }
 
 // --- Window --- //
@@ -267,6 +284,9 @@ static void window_load(Window *window) {
   GRect bounds = layer_get_bounds(root);
   GPoint center = grect_center_point(&bounds);
   int16_t min_dim = min(bounds.size.w, bounds.size.h);
+  
+  // Initialize the occupied screen cell tracker
+  cells_init(center, min_dim, 10);
 
   // Fractal layer
   s_fractal_layer = layer_create(bounds);
@@ -277,26 +297,16 @@ static void window_load(Window *window) {
   s_notch_layer = layer_create(bounds);
   layer_set_update_proc(s_notch_layer, notch_update_proc);
   layer_add_child(root, s_notch_layer);
-
-  cells_init(center, min_dim, 10);
   
-  // Date label — positioned at the 3 o'clock area (right of center)
-  // Pebble Time 2 center is (100, 114); 3 o'clock sits ~ x=148
-  GRect date_rect = GRect(bounds.size.w / 2, 104, 70, 20);
+  // Text layer
+  GRect date_rect = GRect(0, 0, 70, 20);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
-  text_layer_set_font(s_date_layer,
-  fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  layer_set_update_proc(text_layer_get_layer(s_date_layer), date_update_proc);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
-
-  // Trigger an immediate date update so the label isn't blank on launch
-  time_t now = time(NULL);
-  struct tm *t   = localtime(&now);
-  static char date_buf[16];
-  strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-  text_layer_set_text(s_date_layer, date_buf);
   
   // Animation stuff
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
