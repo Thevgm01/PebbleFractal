@@ -1,11 +1,11 @@
 #include <pebble.h>
 #include "cells.h"
 
-#define FASTMODE
+//#define FASTMODE
 //#define RANDOM
 
 //#define CIRCLES
-#define DRAW_GRID
+//#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 0 / 3
@@ -24,6 +24,7 @@ static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
 
 static Animation *s_animation;
+static bool s_animation_was_running;
 static int8_t s_max_depth;
 static int16_t s_length_mult_for_max_depth;
 
@@ -31,7 +32,7 @@ static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 
-static bool s_move_date;
+static bool s_mark_points;
 
 // --- Drawing Functions --- //
 
@@ -55,15 +56,16 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
   // Animate the length per depth
-  if (depth == s_max_depth) {
+  if (depth == s_max_depth)
     length *= s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
-  }
   
   // Early return if our length is zero (nothing to draw)
-  if (length == 0) return;
+  if (length == 0)
+    return;
   
   // Mark our origin point occupied for determining the date placement
-  if (s_move_date) cells_mark_occupied(origin);
+  if (s_mark_points)
+    cells_mark_occupied(origin);
   
   // Figure out where our hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
@@ -81,7 +83,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
   
   // Make the hands white for the uppermost layer
-  if (depth == 0) graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+  if (depth == 0)
+    graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
   // Don't need to set back to gray because the uppermost layers are drawn last
   
   #ifdef CIRCLES // Draw circles
@@ -144,22 +147,35 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Current time
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
+  
+  bool update_date = t->tm_sec == 0; // Change the text every minute
+  bool move_date = update_date; // Center on empty space every minute
+  
+  // If the animation just stopped, update and move the date
+  if (s_animation == NULL && s_animation_was_running) { 
+    s_animation_was_running = false;
+    update_date = true;
+    move_date = true;
+  }
 
   // Convert to angle
   #ifdef RANDOM
     srand(now);
     s_hour_angle = rand() % TRIG_MAX_ANGLE;
     s_minute_angle = rand() % TRIG_MAX_ANGLE;
+    move_date = true;
   #else
     s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
     s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
     #ifdef FASTMODE
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
+      move_date = true;
     #endif
   #endif
   
   // Draw fractal
+  s_mark_points = move_date;
   s_fractal_ctx = ctx;
   graphics_context_set_antialiased(ctx, false);
   graphics_context_set_stroke_width(ctx, 1);
@@ -171,9 +187,17 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
   #endif
   
-  GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_get_largest_rect()));
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d", date_ul.x, date_ul.y);
-  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
+  if (move_date) {
+    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_get_largest_rect()));
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d", date_ul.x, date_ul.y);
+    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
+  }
+  
+  if (update_date) {
+    static char date_buf[16];
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+    text_layer_set_text(s_date_layer, date_buf);
+  }
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -202,27 +226,12 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  #ifdef FASTMODE
-    s_move_date = true;
+  #ifndef FASTMODE
     layer_mark_dirty(s_fractal_layer);
-    layer_mark_dirty(text_layer_get_layer(s_date_layer));
-  
-    static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
-    text_layer_set_text(s_date_layer, date_buf);
   #else
-    if (tick_time->tm_sec % 5 == 0) {
-      // Redraw the fractal every 5 seconds
+    // Redraw the fractal every 10 seconds
+    if (tick_time->tm_sec % 10 == 0)
       layer_mark_dirty(s_fractal_layer);
-
-      #ifdef DRAW_GRID
-        s_move_date = true;
-      #endif
-      
-      if ((units_changed & (MINUTE_UNIT | DAY_UNIT)) > 0) {
-        s_move_date = true;
-      }
-    }
   #endif
 }
 
@@ -243,6 +252,7 @@ static void start_animation() {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Starting animation");
   if (s_animation) animation_destroy(s_animation);
   s_animation = animation_create();
+  s_animation_was_running = true;
   animation_set_implementation(s_animation, &s_animation_impl);
   animation_set_handlers(s_animation, (AnimationHandlers) { .stopped = animation_stopped_proc }, NULL);
   animation_set_duration(s_animation, 2000);
