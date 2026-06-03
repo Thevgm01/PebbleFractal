@@ -310,9 +310,9 @@ static void window_load(Window *window) {
   
   // Initial date placement
   s_max_depth = MAX_RECURSION_DEPTH;
-  s_length_mult_for_max_depth = 0;
   fractal_update_proc(s_fractal_layer, NULL);
-  
+  s_max_depth = 0;
+
   // Animation stuff
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
     .did_focus = focus_handler
