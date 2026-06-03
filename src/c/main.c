@@ -12,7 +12,7 @@
 #define HOUR_HAND_SCALE 7 / 10
 #define THICKNESS_MULT 0 / 8
 
-#define MAX_RECURSION_DEPTH 12
+#define MAX_RECURSION_DEPTH 13
 #define RECURSE_SCALE 16 / 20
 
 #define min(a, b) (a < b ? a : b)
@@ -57,7 +57,7 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
   // Animate the length per depth
   if (depth == s_max_depth)
-    length *= s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
+    length = length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
   
   // Early return if our length is zero (nothing to draw)
   if (length == 0)
@@ -244,7 +244,7 @@ static void animation_update_proc(Animation *animation, const AnimationProgress 
   layer_mark_dirty(s_fractal_layer);
 }
 static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
-  s_max_depth = MAX_RECURSION_DEPTH + 1;
+  s_max_depth = MAX_RECURSION_DEPTH;
   s_animation = NULL;
 }
 static AnimationImplementation s_animation_impl = { .update = animation_update_proc };
