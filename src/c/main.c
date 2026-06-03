@@ -38,8 +38,9 @@ static bool s_move_date;
 static GPoint add_to_gpoint(GPoint a, int16_t x, int16_t y) { return GPoint(a.x + x, a.y + y); }
 static GPoint add_gpoints(GPoint a, GPoint b) { return GPoint(a.x + b.x, a.y + b.y); }
 static GPoint sub_gpoints(GPoint a, GPoint b) { return GPoint(a.x - b.x, a.y - b.y); }
-static GPoint center_rect_in_rect(GRect child, GRect parent) {
-  return sub_gpoints(grect_center_point(&parent), grect_center_point(&child)); }
+static GPoint center_in_rect(GSize size, GRect rect) {
+  return GPoint(rect.origin.x + (rect.size.w - size.w) / 2, rect.origin.y + (rect.size.h - size.h) / 2);
+}
 
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
@@ -87,7 +88,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     if (half_width > 1) {
       graphics_draw_circle(ctx, minute_point, half_width);
       graphics_draw_circle(ctx, hour_point, half_width);
-    } else {
+    } else { // Circles too small, draw a point
       graphics_draw_pixel(ctx, minute_point);
       graphics_draw_pixel(ctx, hour_point);
     }
@@ -96,8 +97,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
       if (length > 1) {
         graphics_draw_line(s_fractal_ctx, origin, minute_point);
         graphics_draw_line(s_fractal_ctx, origin, hour_point);
-      } else {
-        // If they're too short, draw points instead of lines
+      } else { // Line's too short, draw a point
         graphics_draw_pixel(s_fractal_ctx, minute_point);
         graphics_draw_pixel(s_fractal_ctx, hour_point);
       }
@@ -170,6 +170,10 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     cells_get_largest_rect(); // Discard return
     cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
   #endif
+  
+  GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_get_largest_rect()));
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d", date_ul.x, date_ul.y);
+  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -195,33 +199,17 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
-static void date_update_proc(Layer *layer, GContext *ctx) {
-  time_t now = time(NULL);
-  struct tm* t = localtime(&now);
-  
-  s_move_date = false;
-  cells_get_largest_rect();
-  
-  char date_buf[16];
-  strftime(date_buf, sizeof(date_buf), "%a %b %d", t); // Mon Jun 01
-  text_layer_set_text(s_date_layer, date_buf);
-
-  GRect bounds = layer_get_bounds(s_notch_layer);
-  GPoint center = grect_center_point(&bounds);
-  layer_set_frame(
-    text_layer_get_layer(s_date_layer),
-    GRect(
-      center.x, center.y,
-      80, 20));
-}
-
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   #ifdef FASTMODE
     s_move_date = true;
     layer_mark_dirty(s_fractal_layer);
-    //layer_mark_dirty(text_layer_get_layer(s_date_layer));
+    layer_mark_dirty(text_layer_get_layer(s_date_layer));
+  
+    static char date_buf[16];
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", tick_time);
+    text_layer_set_text(s_date_layer, date_buf);
   #else
     if (tick_time->tm_sec % 5 == 0) {
       // Redraw the fractal every 5 seconds
@@ -231,10 +219,8 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
         s_move_date = true;
       #endif
       
-      // Update the date label once a minute (or on first load)
       if ((units_changed & (MINUTE_UNIT | DAY_UNIT)) > 0) {
         s_move_date = true;
-        layer_mark_dirty(text_layer_get_layer(s_date_layer));
       }
     }
   #endif
@@ -302,7 +288,6 @@ static void window_load(Window *window) {
   text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
-  layer_set_update_proc(text_layer_get_layer(s_date_layer), date_update_proc);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Animation stuff

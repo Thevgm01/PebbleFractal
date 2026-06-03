@@ -4,7 +4,7 @@
 #define BITS 16
 static int16_t grid[BITS]; // 16x16 bit matrix
 static int16_t new_grid[BITS];
-static int16_t changed_bits = 1; // Calculate on first run
+static bool check_for_change = true;
 static int16_t default_grid[BITS] = {
   #ifdef PBL_ROUND
     0b1111100000011111,
@@ -24,22 +24,22 @@ static int16_t default_grid[BITS] = {
     0b1110000000000111,
     0b1111100000011111,
   #else
-    0b1111100000011111,
-    0b1100000000000011,
+    0b1111000000001111,
     0b1000000000000001,
     0b1000000000000001,
     0b1000000000000001,
+    0b0000000000000000,
     0b0000000000000000,
     0b0000000000000000,
     0b0000000110000000,
     0b0000000110000000,
     0b0000000000000000,
     0b0000000000000000,
+    0b0000000000000000,
     0b1000000000000001,
     0b1000000000000001,
     0b1000000000000001,
-    0b1100000000000011,
-    0b1111100000011111,
+    0b1111000000001111,
   #endif
 };
 
@@ -61,6 +61,7 @@ void cells_mark_occupied(GPoint pos) {
   if (y >= 0 && y < BITS) {
     int16_t x = (pos.x - region.origin.x) * BITS / region.size.w;
     if (x >= 0 && x < BITS) {
+      check_for_change = true;
       new_grid[y] |= 1 << x;
     }
   }
@@ -68,7 +69,7 @@ void cells_mark_occupied(GPoint pos) {
 
 // --- Drawing --- //
 
-static GRect local_to_pixel_space(GRect rect) {
+GRect cells_local_to_pixel_space(GRect rect) {
   return GRect(rect.origin.x * region.size.w / BITS + region.origin.x,
                rect.origin.y * region.size.h / BITS + region.origin.y,
                rect.size.w * region.size.w / BITS,
@@ -88,12 +89,12 @@ void cells_debug_draw(GContext *ctx, GColor filled_color, GColor empty_color, GC
   }
   // Draw the largest rectangle
   graphics_context_set_stroke_color(ctx, rect_color);
-  graphics_draw_rect(ctx, local_to_pixel_space(largest_rect));
+  graphics_draw_rect(ctx, cells_local_to_pixel_space(largest_rect));
 }
 
 // --- Largest rect caclulation --- //
 
-// Slightly prefer wider rects
+// Slightly prefer wider rects, even if they would otherwise have the same area as a tall rect
 static int16_t gsize_score(GSize size) {
   return (size.w - 2) * size.h;
 }
@@ -139,35 +140,46 @@ static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {
 
 // Find the largest rect within the bit matrix
 GRect cells_get_largest_rect() {
-  // Flush out the in-progress grid, and determine if anything has changed
+  // Ensure that any bits have been set before we do any work
+  if (!check_for_change)
+    return largest_rect;
+  check_for_change = false;
+  
+  // Flush out the in-progress grid, and determine if anything has truly changed since last time
+  int16_t changed_bits = 0;
   for (int16_t i = 0; i < BITS; i++) {
     changed_bits |= grid[i] ^ new_grid[i];
     grid[i] = new_grid[i];
     new_grid[i] = default_grid[i];
   }
   
-  // If something has changed, we need to recalculate the largest rect
-  if (changed_bits != 0) {
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Bit matrix updated");
-    changed_bits = 0;
-    largest_rect = GRectZero;
-    
-    // Generate histograms by scanning one row at a time
-    static int16_t histogram[BITS] = {0};
-    for (int16_t y = BITS - 1; y >= 0; y--) {
-      for (int16_t x = 0; x < BITS; x++) {
-        histogram[x] = (grid[y] & (1 << x)) != 0 ? 0 : histogram[x] + 1; // Add or reset
-      }
-      
-      // Scan through each histogram looking for the largest rect
-      GRect possible_largest = compute_histogram_rect(histogram, y);
-      
-      // Compare with the previous largest
-      if (gsize_larger(possible_largest.size, largest_rect.size)) {
-        largest_rect = possible_largest;
-      }
+  // If we set the same bits as last time, no need to reclaculate the rect
+  if (changed_bits == 0)
+    return largest_rect;
+  
+  // However, if something did change...
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Bit matrix updated");
+  changed_bits = 0;
+  largest_rect = GRectZero;
+
+  // Generate histograms by scanning one row at a time
+  static int16_t histogram[BITS];
+  for (int16_t i = 0; i < BITS; i++)
+    histogram[i] = 0; // Reset histogram values since static arrays don't do that apparently
+
+  for (int16_t y = BITS - 1; y >= 0; y--) {
+    for (int16_t x = 0; x < BITS; x++)
+      histogram[x] = (grid[y] & (1 << x)) != 0 ? 0 : histogram[x] + 1; // Add or reset
+
+    // Scan through each histogram looking for the largest rect
+    GRect possible_largest = compute_histogram_rect(histogram, y);
+
+    // Compare with the previous largest
+    if (gsize_larger(possible_largest.size, largest_rect.size)) {
+      largest_rect = possible_largest;
     }
   }
   
+  // Note: this could still end up being the same rect as before (but at least we're sure about it)
   return largest_rect;
 }
