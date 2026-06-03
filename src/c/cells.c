@@ -53,7 +53,14 @@ static int16_t histogram_stack_pop() { return histogram_stack[--histogram_stack_
 static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_count - 1]; }
 
 void cells_init(GPoint center, int16_t min_dim, int16_t inset) {
+  // Set the pixel region
   region = grect_crop(GRect(center.x - min_dim / 2, center.y - min_dim / 2, min_dim, min_dim), inset);
+  
+  // Initialize the bit matrix
+  for (int16_t i = 0; i < BITS; i++) {
+    grid[i] = default_grid[i];
+    new_grid[i] = default_grid[i];
+  }
 }
 
 void cells_mark_occupied(GPoint pos) {

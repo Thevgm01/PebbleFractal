@@ -31,7 +31,6 @@ static int16_t s_length_mult_for_max_depth;
 static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
-
 static bool s_mark_points;
 
 // --- Drawing Functions --- //
@@ -78,6 +77,10 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     draw_hands_recursive(minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
     draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
   }
+  
+  // Return if we have no context to draw to (will only happen during the first run for initial date placement)
+  if (s_fractal_ctx == NULL)
+    return;
   
   // Determine line width (can be zero)
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
@@ -148,8 +151,8 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
   
-  bool update_date = t->tm_sec == 0; // Change the text every minute
-  bool move_date = update_date; // Center on empty space every minute
+  bool update_date = t->tm_sec == 0 || ctx == NULL; // Change the text every minute, or on first load
+  bool move_date = update_date; // Center on empty space every minute, or on first load
   
   // If the animation just stopped, update and move the date
   if (s_animation == NULL && s_animation_was_running) { 
@@ -170,21 +173,25 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     #ifdef FASTMODE
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
-      move_date = true;
+      if (s_animation == NULL) move_date = true;
     #endif
   #endif
   
   // Draw fractal
   s_mark_points = move_date;
   s_fractal_ctx = ctx;
-  graphics_context_set_antialiased(ctx, false);
-  graphics_context_set_stroke_width(ctx, 1);
-  graphics_context_set_stroke_color(ctx, GColorDarkGray);
+  if (ctx != NULL) {
+    graphics_context_set_antialiased(ctx, false);
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_context_set_stroke_color(ctx, GColorDarkGray);
+  }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
   #ifdef DRAW_GRID
-    cells_get_largest_rect(); // Discard return
-    cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
+    if (ctx != NULL) {
+      cells_get_largest_rect(); // Discard return
+      cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
+    }
   #endif
   
   if (move_date) {
@@ -245,6 +252,7 @@ static void animation_update_proc(Animation *animation, const AnimationProgress 
 }
 static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
   s_max_depth = MAX_RECURSION_DEPTH;
+  s_length_mult_for_max_depth = 0;
   s_animation = NULL;
 }
 static AnimationImplementation s_animation_impl = { .update = animation_update_proc };
@@ -299,6 +307,11 @@ static void window_load(Window *window) {
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
+  
+  // Initial date placement
+  s_max_depth = MAX_RECURSION_DEPTH;
+  s_length_mult_for_max_depth = 0;
+  fractal_update_proc(s_fractal_layer, NULL);
   
   // Animation stuff
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
