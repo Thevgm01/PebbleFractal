@@ -167,7 +167,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
   #ifdef DRAW_GRID
-    cells_update_largest_rect();
+    cells_get_largest_rect(); // Discard return
     cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
   #endif
 }
@@ -200,11 +200,9 @@ static void date_update_proc(Layer *layer, GContext *ctx) {
   struct tm* t = localtime(&now);
   
   s_move_date = false;
-  #ifndef DRAW_GRID
-    cells_update_largest_rect();
-  #endif
+  cells_get_largest_rect();
   
-  static char date_buf[16];
+  char date_buf[16];
   strftime(date_buf, sizeof(date_buf), "%a %b %d", t); // Mon Jun 01
   text_layer_set_text(s_date_layer, date_buf);
 
@@ -213,9 +211,33 @@ static void date_update_proc(Layer *layer, GContext *ctx) {
   layer_set_frame(
     text_layer_get_layer(s_date_layer),
     GRect(
-      sin_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 25 / TRIG_MAX_RATIO + center.x,
-      -cos_lookup(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2)) * 50 / TRIG_MAX_RATIO + center.y,
+      center.x, center.y,
       80, 20));
+}
+
+// --- Ticks --- //
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  #ifdef FASTMODE
+    s_move_date = true;
+    layer_mark_dirty(s_fractal_layer);
+    //layer_mark_dirty(text_layer_get_layer(s_date_layer));
+  #else
+    if (tick_time->tm_sec % 5 == 0) {
+      // Redraw the fractal every 5 seconds
+      layer_mark_dirty(s_fractal_layer);
+
+      #ifdef DRAW_GRID
+        s_move_date = true;
+      #endif
+      
+      // Update the date label once a minute (or on first load)
+      if ((units_changed & (MINUTE_UNIT | DAY_UNIT)) > 0) {
+        s_move_date = true;
+        layer_mark_dirty(text_layer_get_layer(s_date_layer));
+      }
+    }
+  #endif
 }
 
 // --- Animation --- //
@@ -240,29 +262,6 @@ static void start_animation() {
   animation_set_duration(s_animation, 2000);
   animation_set_curve(s_animation, AnimationCurveLinear);
   animation_schedule(s_animation);
-}
-
-// --- Ticks --- //
-
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  #ifdef FASTMODE
-    s_move_date = true;
-    cells_reset();
-    layer_mark_dirty(s_fractal_layer);
-    layer_mark_dirty(text_layer_get_layer(s_date_layer));
-  #else
-    if (tick_time->tm_sec % 5 == 0) {
-      // Redraw the fractal every 5 seconds
-      layer_mark_dirty(s_fractal_layer);
-
-      // Update the date label once a minute (or on first load)
-      if ((units_changed & (MINUTE_UNIT | DAY_UNIT)) > 0) {
-        s_move_date = true;
-        cells_reset();
-        layer_mark_dirty(text_layer_get_layer(s_date_layer));
-      }
-    }
-  #endif
 }
 
 // --- Window --- //
