@@ -226,7 +226,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  #ifndef FASTMODE
+  #ifdef FASTMODE
     layer_mark_dirty(s_fractal_layer);
   #else
     // Redraw the fractal every 10 seconds
