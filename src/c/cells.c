@@ -104,15 +104,6 @@ static bool gsize_larger(GSize a, GSize b) {
   return a.w >= 6 && a.h >= 2 && gsize_score(a) > gsize_score(b);
 }
 
-static bool grect_larger(GRect a, GRect b) {
-  int16_t a_distance_penalty = // Sum of manhattan distances to upper left corner and lower right corner
-    abs(b.origin.x - a.origin.x) + 
-    abs(b.origin.y - a.origin.y) + 
-    abs(b.origin.x + b.size.w - a.origin.x - a.size.w) + 
-    abs(b.origin.y + b.size.h - a.origin.y - a.size.h);
-  return gsize_score(a.size) - a_distance_penalty > gsize_score(b.size);
-}
-
 // Find the largest rect within a 1D histogram
 static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {  
   GRect result = GRectZero;
@@ -172,7 +163,7 @@ GRect cells_get_largest_rect() {
       GRect possible_largest = compute_histogram_rect(histogram, y);
       
       // Compare with the previous largest
-      if (grect_larger(possible_largest, largest_rect)) {
+      if (gsize_larger(possible_largest.size, largest_rect.size)) {
         largest_rect = possible_largest;
       }
     }
