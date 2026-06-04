@@ -3,17 +3,16 @@
 
 //#define FASTMODE
 //#define RANDOM
-
 //#define CIRCLES
 //#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
-#define TRUE_HAND_MULT 0 / 3
-#define HOUR_HAND_SCALE 7 / 10
-#define THICKNESS_MULT 0 / 8
+#define TRUE_HAND_MULT 150 / 100
+#define HOUR_HAND_SCALE 70 / 100
+#define THICKNESS_MULT 0 / 100
+#define RECURSE_SCALE 80 / 100
 
 #define MAX_RECURSION_DEPTH 13
-#define RECURSE_SCALE 16 / 20
 
 #define min(a, b) (a < b ? a : b)
 
@@ -92,11 +91,11 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   #ifdef CIRCLES // Draw circles
     if (half_width > 1) {
-      graphics_draw_circle(ctx, minute_point, half_width);
-      graphics_draw_circle(ctx, hour_point, half_width);
+      graphics_draw_circle(s_fractal_ctx, minute_point, half_width);
+      graphics_draw_circle(s_fractal_ctx, hour_point, half_width);
     } else { // Circles too small, draw a point
-      graphics_draw_pixel(ctx, minute_point);
-      graphics_draw_pixel(ctx, hour_point);
+      graphics_draw_pixel(s_fractal_ctx, minute_point);
+      graphics_draw_pixel(s_fractal_ctx, hour_point);
     }
   #else // Draw lines
     if (half_width <= 1) { // Hands are thin, draw them as individual lines
@@ -287,7 +286,7 @@ static void window_load(Window *window) {
   int16_t min_dim = min(bounds.size.w, bounds.size.h);
   
   // Initialize the occupied screen cell tracker
-  cells_init(center, min_dim, 10);
+  cells_init(center, min_dim, 15);
 
   // Fractal layer
   s_fractal_layer = layer_create(bounds);
