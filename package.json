@@ -1,27 +1,39 @@
 {
-    "author": "MakeAwesomeHappen",
-    "dependencies": {},
+    "author": "thevgm",
+    "dependencies": {
+        "@rebble/clay": "^1.0.10"
+    },
     "keywords": [
         "pebble-app"
     ],
-    "name": "watchface-tutorial",
+    "name": "fractal",
     "pebble": {
-        "displayName": "Tutorial Watchface",
+        "capabilities": [
+            "configurable"
+        ],
+        "displayName": "Fractal Analog",
         "enableMultiJS": true,
-        "messageKeys": [],
+        "messageKeys": [
+            "PrimaryColor",
+            "SecondaryColor",
+            "BackgroundColor",
+            "ShowDate",
+            "MinuteHandLength",
+            "HourHandLength",
+            "RecurseScale",
+            "WidthScale",
+            "TrueHandScale"
+        ],
         "projectType": "native",
         "resources": {
             "media": []
         },
         "sdkVersion": "3",
         "targetPlatforms": [
-            "aplite",
             "basalt",
             "chalk",
-            "diorite",
             "emery",
-            "gabbro",
-            "flint"
+            "gabbro"
         ],
         "uuid": "11445def-0f1c-47f6-82b9-bc9f57543a20",
         "watchapp": {

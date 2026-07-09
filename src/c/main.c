@@ -1,10 +1,10 @@
 #include <pebble.h>
 #include "cells.h"
 
-//#define FASTMODE
+#define FASTMODE
 //#define RANDOM
 //#define CIRCLES
-//#define DRAW_GRID
+#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 150 / 100
