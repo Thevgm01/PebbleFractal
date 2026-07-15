@@ -61,27 +61,29 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   if (length == 0)
     return;
   
-  // Mark our origin point occupied for determining the date placement
-  if (s_mark_points)
-    cells_mark_occupied(origin);
-  
   // Figure out where our hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int16_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
   GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
   GPoint hour_point = point_on_circle(origin, new_hour_angle, length * HOUR_HAND_SCALE);
-
+  
   // Recurse before drawing so that earlier branches appear on top
   if (depth < s_max_depth) {
     draw_hands_recursive(minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
     draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
   }
   
+  // Mark the next points occupied for determining the date placement
+  if (s_mark_points) {
+    cells_mark_occupied(minute_point);
+    cells_mark_occupied(hour_point);
+  }
+  
   // Return if we have no context to draw to (will only happen during the first run for initial date placement)
   if (s_fractal_ctx == NULL)
     return;
   
-  // Determine line width (can be zero)
+  // Determine line width (can be zero, which will draw a 1-pixel line)
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
   
   // Make the hands white for the uppermost layer
@@ -151,13 +153,13 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   struct tm* t = localtime(&now);
   
   bool update_date = t->tm_sec == 0 || ctx == NULL; // Change the text every minute, or on first load
-  bool move_date = update_date; // Center on empty space every minute, or on first load
-  
+  s_mark_points = t->tm_sec % 30 == 0; // Check if we need to move the date twice per minute
+
   // If the animation just stopped, update and move the date
   if (s_animation == NULL && s_animation_was_running) { 
     s_animation_was_running = false;
     update_date = true;
-    move_date = true;
+    s_mark_points = true;
   }
 
   // Convert to angle
@@ -172,12 +174,11 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     #ifdef FASTMODE
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
-      if (s_animation == NULL) move_date = true;
+      if (s_animation == NULL) s_mark_points = true;
     #endif
   #endif
   
   // Draw fractal
-  s_mark_points = move_date;
   s_fractal_ctx = ctx;
   if (ctx != NULL) {
     graphics_context_set_antialiased(ctx, false);
@@ -186,19 +187,28 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
-  #ifdef DRAW_GRID
-    if (ctx != NULL) {
-      cells_get_largest_rect(); // Discard return
-      cells_debug_draw(ctx, GColorRed, GColorGreen, GColorOrange);
-    }
-  #endif
-  
+  bool move_date = cells_sensitive_overwritten() || ctx == NULL;
   if (move_date) {
-    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_get_largest_rect()));
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "x: %d, y: %d", date_ul.x, date_ul.y);
+    cells_update_largest_rect();
+    
+    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_largest_rect));
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: new position x: %d, y: %d", date_ul.x, date_ul.y);
     layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
+    
+    cells_reset_sensitive();
   }
   
+  #ifdef DRAW_GRID
+  if (ctx != NULL) {
+    if (!move_date)
+      cells_update_largest_rect();
+    
+    cells_debug_draw(ctx, GColorYellow, GColorRed, GColorGreen, GColorOrange);
+  }
+  #endif
+  
+  cells_reset_occupied();
+
   if (update_date) {
     static char date_buf[16];
     strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
