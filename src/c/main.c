@@ -1,10 +1,10 @@
 #include <pebble.h>
 #include "cells.h"
 
-#define FASTMODE
+//#define FASTMODE
 //#define RANDOM
 //#define CIRCLES
-#define DRAW_GRID
+//#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 150 / 100
@@ -23,7 +23,6 @@ static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
 
 static Animation *s_animation;
-static bool s_animation_was_running;
 static int8_t s_max_depth;
 static int16_t s_length_mult_for_max_depth;
 
@@ -152,15 +151,11 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
   
-  bool update_date = t->tm_sec == 0 || ctx == NULL; // Change the text every minute, or on first load
-  s_mark_points = t->tm_sec % 30 == 0; // Check if we need to move the date twice per minute
-
-  // If the animation just stopped, update and move the date
-  if (s_animation == NULL && s_animation_was_running) { 
-    s_animation_was_running = false;
-    update_date = true;
-    s_mark_points = true;
-  }
+  // Check if we need to move the date twice per minute, or on first load
+  s_mark_points = (s_animation == NULL && t->tm_sec % 30 == 0) || ctx == NULL;
+  
+  if (s_mark_points)
+    cells_reset_occupied();
 
   // Convert to angle
   #ifdef RANDOM
@@ -174,7 +169,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     #ifdef FASTMODE
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
-      if (s_animation == NULL) s_mark_points = true;
+      s_mark_points = true;
     #endif
   #endif
   
@@ -187,6 +182,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
+  // Move the date if the fractal passed over it, or on first load
   bool move_date = cells_sensitive_overwritten() || ctx == NULL;
   if (move_date) {
     cells_update_largest_rect();
@@ -206,9 +202,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     cells_debug_draw(ctx, GColorYellow, GColorRed, GColorGreen, GColorOrange);
   }
   #endif
-  
-  cells_reset_occupied();
 
+  // Change the text every minute, or on first load
+  bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
   if (update_date) {
     static char date_buf[16];
     strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
@@ -222,7 +218,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   GSize size = bounds.size;
   
   int16_t radius = min(size.w, size.h) / 2;
-  int16_t squircleish_offsets[] = {0, 1, 2, 4, 7, 11, 15, 15, 15, 11, 7, 4, 2, 1, 0};
+  int16_t squircleish_offsets[] = {0, 1, 2, 3, 5, 7, 10, 13, 13, 10, 7, 5, 3, 2, 1};
   
   // Tick marks
   for (int8_t i = 0; i < 60; i++) {
@@ -269,7 +265,6 @@ static void start_animation() {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Starting animation");
   if (s_animation) animation_destroy(s_animation);
   s_animation = animation_create();
-  s_animation_was_running = true;
   animation_set_implementation(s_animation, &s_animation_impl);
   animation_set_handlers(s_animation, (AnimationHandlers) { .stopped = animation_stopped_proc }, NULL);
   animation_set_duration(s_animation, 2000);
