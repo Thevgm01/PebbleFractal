@@ -2,6 +2,7 @@
 #include "cells.h"
 
 //#define FASTMODE
+//#define SCREENSHOTMODE
 //#define RANDOM
 //#define CIRCLES
 //#define DRAW_GRID
@@ -30,6 +31,8 @@ static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 static bool s_mark_points;
+
+static int16_t s_screenshot_frame = 0;
 
 // --- Drawing Functions --- //
 
@@ -163,6 +166,10 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     s_hour_angle = rand() % TRIG_MAX_ANGLE;
     s_minute_angle = rand() % TRIG_MAX_ANGLE;
     move_date = true;
+  #elif defined(SCREENSHOTMODE)
+    s_hour_angle = TRIG_MAX_ANGLE * 1 / 4;
+    s_minute_angle = TRIG_MAX_ANGLE * s_screenshot_frame / 60;
+    s_mark_points = true;
   #else
     s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
     s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
@@ -242,8 +249,14 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
     layer_mark_dirty(s_fractal_layer);
   #else
     // Redraw the fractal every 10 seconds
-    if (tick_time->tm_sec % 10 == 0)
+    if (tick_time->tm_sec % 10 == 0) {
+      
+      #ifdef SCREENSHOTMODE
+        s_screenshot_frame = (s_screenshot_frame + 1) % 60;
+      #endif
+      
       layer_mark_dirty(s_fractal_layer);
+    }
   #endif
 }
 
@@ -315,12 +328,14 @@ static void window_load(Window *window) {
   // Initial date placement
   s_max_depth = MAX_RECURSION_DEPTH;
   fractal_update_proc(s_fractal_layer, NULL);
-  s_max_depth = 0;
 
+  #ifndef SCREENSHOTMODE
   // Animation stuff
+  s_max_depth = 0;
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
     .did_focus = focus_handler
   });
+  #endif
 }
 
 static void window_unload(Window *window) {
