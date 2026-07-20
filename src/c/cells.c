@@ -99,28 +99,43 @@ void cells_mark_occupied(GPoint pos) {
 
 // --- Drawing --- //
 
-GRect cells_local_to_pixel_space(GRect rect) {
+GRect cells_grid_to_pixel(GRect rect) {
   return GRect(rect.origin.x * region.size.w / BITS + region.origin.x,
                rect.origin.y * region.size.h / BITS + region.origin.y,
                rect.size.w * region.size.w / BITS + 2,
                rect.size.h * region.size.h / BITS + 2);
 }
 
+GRect cells_pixel_to_grid(GRect rect) {
+  return GRectZero;
+}
+
+int16_t cells_pixels_per_cell() {
+  return region.size.w / BITS;
+}
+
 void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color, GColor empty_color, GColor rect_color) {
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
-      bool cell_sensitive = (sensitive_grid[y] & (1 << x)) != 0;
-      bool cell_filled = (occupied_grid[y] & (1 << x)) != 0;
-      graphics_context_set_stroke_color(ctx, cell_sensitive ? sensitive_color : cell_filled ? filled_color : empty_color);
-      graphics_draw_pixel(ctx, GPoint(
+      GPoint point = GPoint(
         region.origin.x + (2 * x + 1) * region.size.w / BITS / 2,
-        region.origin.y + (2 * y + 1) * region.size.h / BITS / 2));
+        region.origin.y + (2 * y + 1) * region.size.h / BITS / 2);
+      
+      bool cell_sensitive = (sensitive_grid[y] & (1 << x)) != 0;
+      if (cell_sensitive) {
+        graphics_context_set_stroke_color(ctx, sensitive_color);
+        graphics_draw_circle(ctx, point, 2);
+      } else {
+        bool cell_filled = (occupied_grid[y] & (1 << x)) != 0;
+        graphics_context_set_stroke_color(ctx, cell_filled ? filled_color : empty_color);
+        graphics_draw_pixel(ctx, point);
+      }
     }
   }
   // Draw the largest rectangle
   graphics_context_set_stroke_color(ctx, rect_color);
-  graphics_draw_rect(ctx, cells_local_to_pixel_space(cells_largest_rect));
+  graphics_draw_rect(ctx, cells_grid_to_pixel(cells_largest_rect));
 }
 
 // --- Largest rect caclulation --- //

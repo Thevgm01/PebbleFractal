@@ -1,11 +1,11 @@
 #include <pebble.h>
 #include "cells.h"
 
-//#define FASTMODE
+#define FASTMODE
 //#define SCREENSHOTMODE
 //#define RANDOM
 //#define CIRCLES
-//#define DRAW_GRID
+#define DRAW_GRID
 
 #define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 150 / 100
@@ -194,7 +194,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   if (move_date) {
     cells_update_largest_rect();
     
-    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_pixel_space(cells_largest_rect));
+    GPoint date_ul = center_in_rect(GSize(70, 20), cells_grid_to_pixel(cells_largest_rect));
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: new position x: %d, y: %d", date_ul.x, date_ul.y);
     layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
     
@@ -210,6 +210,8 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   #endif
 
+  cells_reset_occupied();
+  
   // Change the text every minute, or on first load
   bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
   if (update_date) {
@@ -317,11 +319,11 @@ static void window_load(Window *window) {
   layer_add_child(root, s_notch_layer);
   
   // Text layer
-  GRect date_rect = GRect(0, 0, 70, 20);
+  GRect date_rect = GRect(0, 0, 100, 100);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   

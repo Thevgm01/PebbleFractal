@@ -11,7 +11,7 @@
         "capabilities": [
             "configurable"
         ],
-        "displayName": "Fractal Analog",
+        "displayName": "Analog Fractal",
         "enableMultiJS": true,
         "messageKeys": [
             "PrimaryColor",
