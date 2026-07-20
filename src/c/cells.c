@@ -141,14 +141,9 @@ void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color
 // --- Largest rect caclulation --- //
 
 // Slightly prefer wider rects, even if they would otherwise have the same area as a tall rect
+// Strongly prefer rects that meet a minimum width and height
 static int16_t gsize_score(GSize size) {
-  return (size.w - 2) * size.h;
-}
-
-// True if a > b
-// Enforce minimum width and height
-static bool gsize_larger(GSize a, GSize b) {
-  return a.w > 0 && a.h > 0 && gsize_score(a) > gsize_score(b);
+  return (size.w - 2) * size.h + (a.w >= 6 && a.h >= 2 ? 1000 : 0);
 }
 
 // Find the largest rect within a 1D histogram
@@ -162,7 +157,7 @@ static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {
     int16_t prev_hist_value = histogram[histogram_stack_pop()];
     int16_t width = histogram_stack_count == 0 ? index : index - histogram_stack_peek() - 1;
     GSize size = GSize(width, prev_hist_value);
-    if (gsize_larger(size, result.size)) {
+    if (gsize_score(size) > gsize_score(result.size)) {
       int16_t x = histogram_stack_count == 0 ? 0 : histogram_stack_peek() + 1;
       result = GRect(x, y, size.w, size.h);
     }
@@ -203,7 +198,7 @@ void cells_update_largest_rect() {
     GRect possible_largest = compute_histogram_rect(histogram, y);
 
     // Compare with the previous largest
-    if (gsize_larger(possible_largest.size, cells_largest_rect.size)) {
+    if (gsize_score(possible_largest.size) > gsize_score(cells_largest_rect.size)) {
       cells_largest_rect = possible_largest;
     }
   }
