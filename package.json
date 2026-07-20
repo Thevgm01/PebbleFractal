@@ -6,7 +6,7 @@
     "keywords": [
         "pebble-app"
     ],
-    "name": "fractal",
+    "name": "analog-fractal",
     "pebble": {
         "capabilities": [
             "configurable"
@@ -22,7 +22,8 @@
             "HourHandLength",
             "RecurseScale",
             "WidthScale",
-            "TrueHandScale"
+            "FirstHandScale",
+            "FontSize"
         ],
         "projectType": "native",
         "resources": {

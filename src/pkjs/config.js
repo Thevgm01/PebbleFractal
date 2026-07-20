@@ -1,11 +1,11 @@
 module.exports = [
   {
     "type": "heading",
-    "defaultValue": "Fractal Settings"
+    "defaultValue": "Analog Fractal - Settings"
   },
   {
     "type": "text",
-    "defaultValue": "Customize your watchface appearance and preferences."
+    "defaultValue": "Customize the watchface's appearance."
   },
   {
     "type": "section",
@@ -48,6 +48,44 @@ module.exports = [
         "defaultValue": "Sizes"
       },
       {
+        "type": "select",
+        "messageKey": "FontSize",
+        "defaultValue": "18",
+        "label": "Font Size",
+        "options": [
+          { 
+            "label": "14",
+            "value": "14" 
+          },
+          { 
+            "label": "18",
+            "value": "18" 
+          },
+          { 
+            "label": "24",
+            "value": "24" 
+          }
+        ]
+      },
+      {
+        "type": "slider",
+        "messageKey": "MinuteHandLength",
+        "label": "Minute Hand Length",
+        "defaultValue": 60,
+        "min": 0,
+        "max": 100,
+        "step": 5
+      },
+      {
+        "type": "slider",
+        "messageKey": "HourHandLength",
+        "label": "Hour Hand Length",
+        "defaultValue": 40,
+        "min": 0,
+        "max": 100,
+        "step": 5
+      },
+      {
         "type": "slider",
         "messageKey": "RecurseScale",
         "label": "Recurse Scale",
@@ -61,15 +99,17 @@ module.exports = [
         "messageKey": "WidthScale",
         "label": "Width Scale",
         "defaultValue": 0,
+        "description": "Optionally make the hands thicker towards teh top",
         "min": 0,
         "max": 1,
         "step": 0.05
       },
       {
         "type": "slider",
-        "messageKey": "TrueHandScale",
-        "label": "Recurse Scale",
-        "defaultValue": 2,
+        "messageKey": "FirstHandScale",
+        "label": "First Hand Scale",
+        "defaultValue": 1,
+        "description": "If this is greater than 1, make the topmost hands extra long to help with legibility",
         "min": 1,
         "max": 3,
         "step": 0.25
