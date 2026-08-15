@@ -99,7 +99,7 @@ module.exports = [
         "messageKey": "WidthScale",
         "label": "Width Scale",
         "defaultValue": 0,
-        "description": "Optionally make the hands thicker towards teh top",
+        "description": "Optionally make the hands get thicker the higher up they are",
         "min": 0,
         "max": 1,
         "step": 0.05
@@ -107,9 +107,9 @@ module.exports = [
       {
         "type": "slider",
         "messageKey": "FirstHandScale",
-        "label": "First Hand Scale",
+        "label": "Top Hand Scale",
         "defaultValue": 1,
-        "description": "If this is greater than 1, make the topmost hands extra long to help with legibility",
+        "description": "Optionally make the topmost hands extra long to help with legibility",
         "min": 1,
         "max": 3,
         "step": 0.25

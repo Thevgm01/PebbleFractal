@@ -1,8 +1,9 @@
 #include <pebble.h>
 #include "cells.h"
+#include "math.h"
 
 #define BITS 16
-static int16_t default_grid[BITS] = { // 16x16 bit matrix
+const int16_t default_grid[BITS] = { // 16x16 bit matrix
   #ifdef PBL_ROUND
     0b1111100000011111,
     0b1110000000000111,
@@ -40,10 +41,10 @@ static int16_t default_grid[BITS] = { // 16x16 bit matrix
   #endif
 };
 
+GRect screen_region;
+
 static int16_t occupied_grid[BITS];
 static int16_t sensitive_grid[BITS];
-
-static GRect region;
 
 static int16_t histogram_stack[BITS];
 static int16_t histogram_stack_count = 0;
@@ -51,14 +52,13 @@ static void histogram_stack_push(int16_t value) { histogram_stack[histogram_stac
 static int16_t histogram_stack_pop() { return histogram_stack[--histogram_stack_count]; }
 static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_count - 1]; }
 
-void cells_init(GPoint center, int16_t min_dim, int16_t inset) {
+void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   // Set the pixel region
-  region = grect_crop(GRect(center.x - min_dim / 2, center.y - min_dim / 2, min_dim, min_dim), inset);
+  screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
   
   // Initialize the bit matrix
   cells_largest_rect = GRect(0, 0, 16, 16);
   cells_reset_occupied();
-  cells_reset_sensitive();
 }
 
 bool cells_sensitive_overwritten() {
@@ -73,45 +73,52 @@ void cells_reset_occupied() {
     occupied_grid[i] = default_grid[i];
 }
 
-void cells_reset_sensitive() {
+void cells_reset_sensitive(GRect rect) {
   for (int16_t i = 0; i < BITS; i++)
     sensitive_grid[i] = 0;
-  
-  GRect sensitive_offset = GRect(
-    cells_largest_rect.origin.x + cells_largest_rect.size.w / 2 - 3 + (cells_largest_rect.size.w % 2),
-    cells_largest_rect.origin.y + cells_largest_rect.size.h / 2 - 1 + (cells_largest_rect.size.h % 2),
-    6 - (cells_largest_rect.size.w % 2),
-    2 - (cells_largest_rect.size.h % 2));
-  for (int16_t y = sensitive_offset.origin.y; y < sensitive_offset.origin.y + sensitive_offset.size.h; y++)
-    for (int16_t x = sensitive_offset.origin.x; x < sensitive_offset.origin.x + sensitive_offset.size.w; x++)
-      sensitive_grid[y] |= 1 << x;
+
+  cells_mark_rect_sensitive(cells_world_to_local(rect));
 }
 
-void cells_mark_occupied(GPoint pos) {
-  int16_t y = (pos.y - region.origin.y) * BITS / region.size.h;
+void cells_mark_point(GPoint pos) {
+  int16_t y = (pos.y - screen_region.origin.y) * BITS / screen_region.size.h;
   if (y >= 0 && y < BITS) {
-    int16_t x = (pos.x - region.origin.x) * BITS / region.size.w;
+    int16_t x = (pos.x - screen_region.origin.x) * BITS / screen_region.size.w;
     if (x >= 0 && x < BITS) {
       occupied_grid[y] |= 1 << x;
     }
   }
 }
 
-// --- Drawing --- //
-
-GRect cells_grid_to_pixel(GRect rect) {
-  return GRect(rect.origin.x * region.size.w / BITS + region.origin.x,
-               rect.origin.y * region.size.h / BITS + region.origin.y,
-               rect.size.w * region.size.w / BITS + 2,
-               rect.size.h * region.size.h / BITS + 2);
+void cells_mark_rect_sensitive(GRect rect) {
+  GRect local_rect = cells_world_to_local(rect);
+  for (int16_t y = max(local_rect.origin.y, 0); y < min(local_rect.size.h, BITS); y++)
+    for (int16_t x = max(local_rect.origin.x, 0); x < min(local_rect.size.w, BITS); x++)
+      sensitive_grid[y] |= 1 << x;
 }
+
+GRect cells_world_to_local(GRect rect) {
+  return GRect((rect.origin.x - screen_region.origin.x) * BITS / screen_region.size.w,
+               (rect.origin.y - screen_region.origin.y) * BITS / screen_region.size.h,
+               rect.size.w * BITS / screen_region.size.w,
+               rect.size.h * BITS / screen_region.size.h);
+}
+
+GRect cells_local_to_world(GRect rect) {
+  return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x,
+               rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y,
+               rect.size.w * screen_region.size.w / BITS + 2,
+               rect.size.h * screen_region.size.h / BITS + 2);
+}
+
+// --- Drawing --- //
 
 GRect cells_pixel_to_grid(GRect rect) {
   return GRectZero;
 }
 
 int16_t cells_pixels_per_cell() {
-  return region.size.w / BITS;
+  return screen_region.size.w / BITS;
 }
 
 void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color, GColor empty_color, GColor rect_color) {
@@ -119,8 +126,8 @@ void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
       GPoint point = GPoint(
-        region.origin.x + (2 * x + 1) * region.size.w / BITS / 2,
-        region.origin.y + (2 * y + 1) * region.size.h / BITS / 2);
+        screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
+        screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2);
       
       bool cell_sensitive = (sensitive_grid[y] & (1 << x)) != 0;
       if (cell_sensitive) {
@@ -135,7 +142,7 @@ void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color
   }
   // Draw the largest rectangle
   graphics_context_set_stroke_color(ctx, rect_color);
-  graphics_draw_rect(ctx, cells_grid_to_pixel(cells_largest_rect));
+  graphics_draw_rect(ctx, cells_local_to_world(cells_largest_rect));
 }
 
 // --- Largest rect caclulation --- //
@@ -143,7 +150,7 @@ void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color
 // Slightly prefer wider rects, even if they would otherwise have the same area as a tall rect
 // Strongly prefer rects that meet a minimum width and height
 static int16_t gsize_score(GSize size) {
-  return (size.w - 2) * size.h + (a.w >= 6 && a.h >= 2 ? 1000 : 0);
+  return (size.w - 2) * size.h + (size.w >= 6 && size.h >= 2 ? 1000 : 0);
 }
 
 // Find the largest rect within a 1D histogram

@@ -1,5 +1,7 @@
 #include <pebble.h>
+#include "settings.h"
 #include "cells.h"
+#include "math.h"
 
 #define FASTMODE
 //#define SCREENSHOTMODE
@@ -14,8 +16,6 @@
 #define RECURSE_SCALE 80 / 100
 
 #define MAX_RECURSION_DEPTH 13
-
-#define min(a, b) (a < b ? a : b)
 
 // --- Static Variables --- //
 static Window *s_window;
@@ -77,8 +77,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    cells_mark_occupied(minute_point);
-    cells_mark_occupied(hour_point);
+    cells_mark_point(minute_point);
+    cells_mark_point(hour_point);
   }
   
   // Return if we have no context to draw to (will only happen during the first run for initial date placement)
@@ -90,7 +90,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Make the hands white for the uppermost layer
   if (depth == 0)
-    graphics_context_set_stroke_color(s_fractal_ctx, GColorWhite);
+    graphics_context_set_stroke_color(s_fractal_ctx, settings.PrimaryColor);
   // Don't need to set back to gray because the uppermost layers are drawn last
   
   #ifdef CIRCLES // Draw circles
@@ -189,16 +189,27 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
+  // Change the text every minute, or on first load
+  bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
+  if (update_date) {
+    static char date_buf[16];
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+    text_layer_set_text(s_date_layer, date_buf);
+  }
+  
   // Move the date if the fractal passed over it, or on first load
   bool move_date = cells_sensitive_overwritten() || ctx == NULL;
   if (move_date) {
     cells_update_largest_rect();
     
-    GPoint date_ul = center_in_rect(GSize(70, 20), cells_grid_to_pixel(cells_largest_rect));
+    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_world(cells_largest_rect));
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: new position x: %d, y: %d", date_ul.x, date_ul.y);
     layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
     
-    cells_reset_sensitive();
+    GSize date_size = text_layer_get_content_size(s_date_layer);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "\tDate size: w: %d, h: %d", date_size.w, date_size.h);
+    
+    cells_reset_sensitive((GRect) { .origin = date_ul, .size = date_size });
   }
   
   #ifdef DRAW_GRID
@@ -210,15 +221,8 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   #endif
 
+  // Reset the fractal grid so it can be written to again
   cells_reset_occupied();
-  
-  // Change the text every minute, or on first load
-  bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
-  if (update_date) {
-    static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-    text_layer_set_text(s_date_layer, date_buf);
-  }
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {

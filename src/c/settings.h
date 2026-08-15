@@ -13,7 +13,7 @@ typedef struct ClaySettings {
   int16_t WidthScale;
   int16_t FirstHandScale;
   int16_t FontSize;
-}
+} ClaySettings;
 
 static ClaySettings settings;
 
@@ -37,4 +37,8 @@ static void settings_save() {
 static void settings_load() {
   settings_restore_default();
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
+static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
+  
 }
