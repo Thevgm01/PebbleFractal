@@ -133,17 +133,18 @@ void cells_debug_draw(GContext *ctx) {
 }
 
 void cells_debug_print() {
-  static char output[(BITS + 1) * 8];
-  for (int16_t y = 0; y < 8; y++) {
-    output[y * (BITS + 1)] = '\n';
+  for (int16_t y = 0; y < BITS; y += 2) {
+    static char output[BITS * 3];
     for (int16_t x = 0; x < BITS; x++) {
-      output[y * (BITS + 1) + x + 1] = 
-        ((cells_occupied_grid[y] | default_grid[y]) & (1 << x)) != 0 ? 'X' 
-        : (cells_sensitive_grid[y] & (1 << x)) != 0 ? 'S'
-        : 'O';
+      bool upper = (cells_occupied_grid[y] & (1 << x)) != 0;
+      bool lower = (cells_occupied_grid[y + 1] & (1 << x)) != 0;
+      if (upper && lower) memcpy(&output[x * 3], "█", 3);
+      else if (upper) memcpy(&output[x * 3], "▀", 3);
+      else if (lower) memcpy(&output[x * 3], "▄", 3);
+      else memcpy(&output[x * 3], " ", 3); // Em Space
     }
+    APP_LOG(APP_LOG_LEVEL_DEBUG, output);
   }
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "%s", output);
 }
 
 // --- Largest rect caclulation --- //
