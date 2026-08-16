@@ -2,7 +2,6 @@
 #include "cells.h"
 #include "math.h"
 
-#define BITS 16
 const int16_t default_grid[BITS] = { // 16x16 bit matrix
   #ifdef PBL_ROUND
     0b1111100000011111,
@@ -43,9 +42,6 @@ const int16_t default_grid[BITS] = { // 16x16 bit matrix
 
 GRect screen_region;
 
-static int16_t occupied_grid[BITS];
-static int16_t sensitive_grid[BITS];
-
 static int16_t histogram_stack[BITS];
 static int16_t histogram_stack_count = 0;
 static void histogram_stack_push(int16_t value) { histogram_stack[histogram_stack_count++] = value; }
@@ -57,44 +53,43 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
   
   // Initialize the bit matrix
-  cells_largest_rect = GRect(0, 0, 16, 16);
-  cells_reset_occupied();
+  cells_largest_rect = GRect(0, 0, BITS, BITS);
+  cells_reset_grid(cells_occupied_grid);
+  cells_reset_grid(cells_sensitive_grid);
 }
 
-bool cells_sensitive_overwritten() {
-  for (int16_t i = 0; i < BITS; i++)
-    if (occupied_grid[i] & sensitive_grid[i] & ~default_grid[i])
-      return true;
-  return false;
+void cells_reset_grid(int16_t grid[]) {
+  for (int16_t y = 0; y < BITS; y++) {
+    grid[y] = default_grid[y];
+  }
 }
 
-void cells_reset_occupied() {
-  for (int16_t i = 0; i < BITS; i++)
-    occupied_grid[i] = default_grid[i];
-}
-
-void cells_reset_sensitive(GRect rect) {
-  for (int16_t i = 0; i < BITS; i++)
-    sensitive_grid[i] = 0;
-
-  cells_mark_rect_sensitive(cells_world_to_local(rect));
-}
-
-void cells_mark_point(GPoint pos) {
-  int16_t y = (pos.y - screen_region.origin.y) * BITS / screen_region.size.h;
+void cells_mark_point(int16_t grid[], GPoint world_pos) {
+  int16_t y = (world_pos.y - screen_region.origin.y) * BITS / screen_region.size.h;
   if (y >= 0 && y < BITS) {
-    int16_t x = (pos.x - screen_region.origin.x) * BITS / screen_region.size.w;
+    int16_t x = (world_pos.x - screen_region.origin.x) * BITS / screen_region.size.w;
     if (x >= 0 && x < BITS) {
-      occupied_grid[y] |= 1 << x;
+      grid[y] |= 1 << x;
     }
   }
 }
 
-void cells_mark_rect_sensitive(GRect rect) {
-  GRect local_rect = cells_world_to_local(rect);
-  for (int16_t y = max(local_rect.origin.y, 0); y < min(local_rect.size.h, BITS); y++)
-    for (int16_t x = max(local_rect.origin.x, 0); x < min(local_rect.size.w, BITS); x++)
-      sensitive_grid[y] |= 1 << x;
+void cells_mark_rect(int16_t grid[], GRect world_rect) {
+  GRect local_rect = cells_world_to_local(world_rect);
+  int16_t row = 0;
+  for (int16_t x = max(local_rect.origin.x, 0); x < min(local_rect.size.w, BITS); x++) {
+    row |= 1 << x;
+  }
+  for (int16_t y = max(local_rect.origin.y, 0); y < min(local_rect.size.h, BITS); y++) {
+    grid[y] |= row;
+  }
+}
+
+bool cells_sensitive_overwritten() {
+  for (int16_t y = 0; y < BITS; y++)
+    if (cells_occupied_grid[y] & cells_sensitive_grid[y] & ~default_grid[y])
+      return true;
+  return false;
 }
 
 GRect cells_world_to_local(GRect rect) {
@@ -113,15 +108,7 @@ GRect cells_local_to_world(GRect rect) {
 
 // --- Drawing --- //
 
-GRect cells_pixel_to_grid(GRect rect) {
-  return GRectZero;
-}
-
-int16_t cells_pixels_per_cell() {
-  return screen_region.size.w / BITS;
-}
-
-void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color, GColor empty_color, GColor rect_color) {
+void cells_debug_draw(GContext *ctx) {  
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
@@ -129,20 +116,34 @@ void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color
         screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
         screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2);
       
-      bool cell_sensitive = (sensitive_grid[y] & (1 << x)) != 0;
+      bool cell_sensitive = (cells_sensitive_grid[y] & ~default_grid[y] & (1 << x)) != 0;
       if (cell_sensitive) {
-        graphics_context_set_stroke_color(ctx, sensitive_color);
+        graphics_context_set_stroke_color(ctx, GColorYellow);
         graphics_draw_circle(ctx, point, 2);
       } else {
-        bool cell_filled = (occupied_grid[y] & (1 << x)) != 0;
-        graphics_context_set_stroke_color(ctx, cell_filled ? filled_color : empty_color);
+        bool cell_filled = (cells_occupied_grid[y] & (1 << x)) != 0;
+        graphics_context_set_stroke_color(ctx, cell_filled ? GColorRed : GColorGreen);
         graphics_draw_pixel(ctx, point);
       }
     }
   }
   // Draw the largest rectangle
-  graphics_context_set_stroke_color(ctx, rect_color);
+  graphics_context_set_stroke_color(ctx, GColorOrange);
   graphics_draw_rect(ctx, cells_local_to_world(cells_largest_rect));
+}
+
+void cells_debug_print() {
+  static char output[(BITS + 1) * 8];
+  for (int16_t y = 0; y < 8; y++) {
+    output[y * (BITS + 1)] = '\n';
+    for (int16_t x = 0; x < BITS; x++) {
+      output[y * (BITS + 1) + x + 1] = 
+        ((cells_occupied_grid[y] | default_grid[y]) & (1 << x)) != 0 ? 'X' 
+        : (cells_sensitive_grid[y] & (1 << x)) != 0 ? 'S'
+        : 'O';
+    }
+  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "%s", output);
 }
 
 // --- Largest rect caclulation --- //
@@ -199,7 +200,7 @@ void cells_update_largest_rect() {
 
   for (int16_t y = BITS - 1; y >= 0; y--) {
     for (int16_t x = 0; x < BITS; x++)
-      histogram[x] = (occupied_grid[y] & (1 << x)) != 0 ? 0 : histogram[x] + 1; // Add or reset
+      histogram[x] = (cells_occupied_grid[y] & (1 << x)) != 0 ? 0 : histogram[x] + 1; // Add or reset
 
     // Scan through each histogram looking for the largest rect
     GRect possible_largest = compute_histogram_rect(histogram, y);

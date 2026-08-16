@@ -1,20 +1,23 @@
 #pragma once
 #include <pebble.h>
 
+#define BITS 16
+
 GRect cells_largest_rect;
+static int16_t cells_occupied_grid[BITS];
+static int16_t cells_sensitive_grid[BITS];
 
 void cells_init(GPoint center, int16_t diameter, int16_t inset);
 
-void cells_reset_occupied();
-void cells_reset_sensitive(GRect rect);
+void cells_reset_grid(int16_t grid[]);
+void cells_mark_point(int16_t grid[], GPoint pos);
+void cells_mark_rect(int16_t grid[], GRect rect);
 bool cells_sensitive_overwritten();
 
 GRect cells_world_to_local(GRect rect);
 GRect cells_local_to_world(GRect rect);
 
-void cells_mark_point(GPoint pos);
-void cells_mark_rect_sensitive(GRect rect);
-
 void cells_update_largest_rect(); // https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/
 
-void cells_debug_draw(GContext *ctx, GColor sensitive_color, GColor filled_color, GColor empty_color, GColor rect_color);
+void cells_debug_draw(GContext *ctx);
+void cells_debug_print();

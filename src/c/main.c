@@ -77,8 +77,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    cells_mark_point(minute_point);
-    cells_mark_point(hour_point);
+    cells_mark_point(cells_occupied_grid, minute_point);
+    cells_mark_point(cells_occupied_grid, hour_point);
   }
   
   // Return if we have no context to draw to (will only happen during the first run for initial date placement)
@@ -157,8 +157,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Check if we need to move the date twice per minute, or on first load
   s_mark_points = (s_animation == NULL && t->tm_sec % 30 == 0) || ctx == NULL;
   
+  // TODO do we need this?
   if (s_mark_points)
-    cells_reset_occupied();
+    cells_reset_grid(cells_occupied_grid);
 
   // Convert to angle
   #ifdef RANDOM
@@ -203,13 +204,12 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     cells_update_largest_rect();
     
     GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_world(cells_largest_rect));
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: new position x: %d, y: %d", date_ul.x, date_ul.y);
     layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
-    
     GSize date_size = text_layer_get_content_size(s_date_layer);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "\tDate size: w: %d, h: %d", date_size.w, date_size.h);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: x: %d, y: %d, w: %d, h: %d", date_ul.x, date_ul.y, date_size.w, date_size.h);
     
-    cells_reset_sensitive((GRect) { .origin = date_ul, .size = date_size });
+    cells_reset_grid(cells_sensitive_grid);
+    cells_mark_rect(cells_sensitive_grid, (GRect) { .origin = date_ul, .size = date_size });
   }
   
   #ifdef DRAW_GRID
@@ -217,12 +217,15 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     if (!move_date)
       cells_update_largest_rect();
     
-    cells_debug_draw(ctx, GColorYellow, GColorRed, GColorGreen, GColorOrange);
+    cells_debug_draw(ctx);
   }
   #endif
 
+  cells_debug_print();
+  
   // Reset the fractal grid so it can be written to again
-  cells_reset_occupied();
+  // TODO what about this one?
+  cells_reset_grid(cells_occupied_grid);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
