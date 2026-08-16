@@ -157,8 +157,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Check if we need to move the date twice per minute, or on first load
   s_mark_points = (s_animation == NULL && t->tm_sec % 30 == 0) || ctx == NULL;
   
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "%b", s_mark_points);
-  
   // TODO do we need this?
   if (s_mark_points)
     cells_reset_grid(cells_occupied_grid);
@@ -192,7 +190,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
-  cells_debug_print();
+  cells_debug_print(cells_occupied_grid);
   
   // Change the text every minute, or on first load
   bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;

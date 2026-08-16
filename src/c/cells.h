@@ -20,4 +20,4 @@ GRect cells_local_to_world(GRect rect);
 void cells_update_largest_rect(); // https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/
 
 void cells_debug_draw(GContext *ctx);
-void cells_debug_print();
+void cells_debug_print(int16_t grid[]);

@@ -132,12 +132,13 @@ void cells_debug_draw(GContext *ctx) {
   graphics_draw_rect(ctx, cells_local_to_world(cells_largest_rect));
 }
 
-void cells_debug_print() {
+void cells_debug_print(int16_t grid[]) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Address of grid: 0x%x", grid);
   for (int16_t y = 0; y < BITS; y += 2) {
     static char output[BITS * 3];
     for (int16_t x = 0; x < BITS; x++) {
-      bool upper = (cells_occupied_grid[y] & (1 << x)) != 0;
-      bool lower = (cells_occupied_grid[y + 1] & (1 << x)) != 0;
+      bool upper = (grid[y] & (1 << x)) != 0;
+      bool lower = (grid[y + 1] & (1 << x)) != 0;
       if (upper && lower) memcpy(&output[x * 3], "█", 3);
       else if (upper) memcpy(&output[x * 3], "▀", 3);
       else if (lower) memcpy(&output[x * 3], "▄", 3);
