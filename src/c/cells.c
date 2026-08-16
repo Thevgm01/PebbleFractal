@@ -133,49 +133,18 @@ void cells_debug_draw(GContext *ctx) {
 }
 
 void cells_debug_print() {
-  static char output[(BITS + 1) * BITS * 3];
-  int16_t i = 0;
-  
   for (int16_t y = 0; y < BITS; y += 2) {
-    for (int16_t x = 0; x < BITS; x += 2) {
-      const int16_t UL = 1;
-      const int16_t UR = 2;
-      const int16_t LL = 4;
-      const int16_t LR = 8;
-      
-      int16_t ul_cell = (cells_occupied_grid[y] & (1 << x)) != 0 ? UL : 0;
-      int16_t ur_cell = (cells_occupied_grid[y] & (1 << (x + 1))) != 0 ? UR : 0;
-      int16_t ll_cell = (cells_occupied_grid[y + 1] & (1 << x)) != 0 ? LL : 0;
-      int16_t lr_cell = (cells_occupied_grid[y + 1] & (1 << (x + 1))) != 0 ? LR : 0;
-      
-      switch (ul_cell + ur_cell + ll_cell + lr_cell) {
-        case 0: output[i] = ' '; i++; break;
-        case UL: memcpy(&output[i], "▘", 3); i += 3; break;
-        case UR: memcpy(&output[i], "▝", 3); i += 3; break;
-        case LR: memcpy(&output[i], "▗", 3); i += 3; break;
-        case LL: memcpy(&output[i], "▖", 3); i += 3; break;
-        case UL | UR: memcpy(&output[i], "▀", 3); i += 3; break;
-        case UR | LR: memcpy(&output[i], "▐", 3); i += 3; break;
-        case LL | LR: memcpy(&output[i], "▄", 3); i += 3; break;
-        case UL | LL: memcpy(&output[i], "▌", 3); i += 3; break;
-        case UL | LR: memcpy(&output[i], "▚", 3); i += 3; break;
-        case UR | LL: memcpy(&output[i], "▞", 3); i += 3; break;
-        case UL | UR | LL: memcpy(&output[i], "▛", 3); i += 3; break;
-        case UL | UR | LR: memcpy(&output[i], "▜", 3); i += 3; break;
-        case UR | LL | LR: memcpy(&output[i], "▟", 3); i += 3; break;
-        case UL | LL | LR: memcpy(&output[i], "▙", 3); i += 3; break;
-        case UL | UR | LL | LR: memcpy(&output[i], "█", 3); i += 3; break;
-      }
+    static char output[BITS * 3];
+    for (int16_t x = 0; x < BITS; x++) {
+      bool upper = (cells_occupied_grid[y] & (1 << x)) != 0;
+      bool lower = (cells_occupied_grid[y + 1] & (1 << x)) != 0;
+      if (upper && lower) memcpy(&output[x * 3], "█", 3);
+      else if (upper) memcpy(&output[x * 3], "▀", 3);
+      else if (lower) memcpy(&output[x * 3], "▄", 3);
+      else memcpy(&output[x * 3], " ", 3); // Em Space
     }
-    output[i] = '\n';
-    i++;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, output);
   }
-  
-  for (; i < (BITS + 1) * BITS * 3; i++) {
-    output[i] = ' ';
-  }
-  
-  APP_LOG(APP_LOG_LEVEL_DEBUG, output);
 }
 
 // --- Largest rect caclulation --- //
