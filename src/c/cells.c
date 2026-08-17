@@ -46,6 +46,7 @@ int16_t cells_occupied_grid[BITS];
 int16_t cells_sensitive_grid[BITS];
 
 GRect screen_region;
+TextCellSizing sizing;
 
 static int16_t histogram_stack[BITS];
 static int16_t histogram_stack_count = 0;
@@ -53,7 +54,7 @@ static void histogram_stack_push(int16_t value) { histogram_stack[histogram_stac
 static int16_t histogram_stack_pop() { return histogram_stack[--histogram_stack_count]; }
 static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_count - 1]; }
 
-void cells_init(GPoint center, int16_t diameter, int16_t inset) {
+void cells_init(GPoint center, int16_t diameter, int16_t inset, TextCellSizing text_sizing) {
   // Set the pixel region
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
   
@@ -61,6 +62,9 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   cells_largest_rect = GRect(0, 0, BITS, BITS);
   cells_reset_grid(cells_occupied_grid);
   cells_reset_grid(cells_sensitive_grid);
+  
+  // Remember the text size settings
+  sizing = text_sizing;
 }
 
 void cells_reset_grid(int16_t grid[]) {
@@ -109,7 +113,7 @@ bool cells_sensitive_overwritten() {
   return false;
 }
 
-GRect cells_get_centered_rect(TextCellSizing sizing, GRect reference_local_rect) {
+GRect cells_get_centered_rect(GRect reference_local_rect) {
   GSize size = GSize(
     reference_local_rect.size.w % 2 == 0 ? sizing.w_even : sizing.w_odd,
     reference_local_rect.size.h % 2 == 0 ? sizing.h_even : sizing.h_odd);
@@ -171,15 +175,18 @@ void cells_debug_print(int16_t grid[]) {
 
 // --- Largest rect caclulation --- //
 
-// Prefer wider rects, even if they would otherwise have the same area as a tall rect
-// Strongly prefer rects that meet a minimum width and/or height
 static int16_t gsize_score(GSize size) {
-  return size.w * (size.h + 6) + (size.w >= 6 ? 1000 : 0) + (size.h >= 2 ? 1000 : 0);
+  // Strongly prefer rects that meet a minimum width and/or height
+  bool meets_w = (is_even(size.w) && size.w >= sizing.w_even) || (is_odd(size.w) && size.w >= sizing.w_odd);
+  bool meets_h = (is_even(size.h) && size.h >= sizing.h_even) || (is_odd(size.h) && size.h >= sizing.h_odd);
+  // Somewhat prefer wider rects, even if they technically have the same area as a tall rect
+  return size.w * (size.h + 6) + (meets_w ? 1000 : 0) + (meets_h ? 1000 : 0);
 }
 
 // Find the largest rect within a 1D histogram
 static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {  
   GRect result = GRectZero;
+  int16_t result_score = 0;
   
   // Seems like nested functions aren't allowed except under cetain compilers?
   // Appears to work fine for Pebble, and it saves several lines of code
@@ -188,9 +195,11 @@ static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {
     int16_t prev_hist_value = histogram[histogram_stack_pop()];
     int16_t width = histogram_stack_count == 0 ? index : index - histogram_stack_peek() - 1;
     GSize size = GSize(width, prev_hist_value);
-    if (gsize_score(size) > gsize_score(result.size)) {
+    int16_t score = gsize_score(size);
+    if (score > result_score) {
       int16_t x = histogram_stack_count == 0 ? 0 : histogram_stack_peek() + 1;
       result = GRect(x, y, size.w, size.h);
+      result_score = score;
     }
   }
   
@@ -214,6 +223,7 @@ static GRect compute_histogram_rect(int16_t histogram[], int16_t y) {
 void cells_update_largest_rect() {
   
   cells_largest_rect = GRectZero;
+  int16_t largest_rect_score = 0;
   
   static int16_t histogram[BITS];
   
@@ -227,10 +237,12 @@ void cells_update_largest_rect() {
 
     // Scan through each histogram looking for the largest rect
     GRect possible_largest = compute_histogram_rect(histogram, y);
+    int16_t score = gsize_score(possible_largest.size);
 
     // Compare with the previous largest
-    if (gsize_score(possible_largest.size) > gsize_score(cells_largest_rect.size)) {
+    if (score > largest_rect_score) {
       cells_largest_rect = possible_largest;
+      largest_rect_score = score;
     }
   }
 }

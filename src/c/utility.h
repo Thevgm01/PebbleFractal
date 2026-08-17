@@ -4,6 +4,9 @@
 #define min(a, b) (a < b ? a : b)
 #define max(a, b) (a > b ? a : b)
 
+#define is_even(a) (a % 2 == 0)
+#define is_odd(a) (a % 2 == 1)
+
 #define APP_LOG_GRECT(log_level, string, rect) APP_LOG( \
   log_level, \
   "%sGRect(x:%d, y:%d, w:%d, h:%d)", \

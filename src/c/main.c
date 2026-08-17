@@ -32,7 +32,6 @@ static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 static bool s_mark_points;
 static GRect s_date_rect;
-static TextCellSizing s_date_grid_sizing;
 
 static int16_t s_screenshot_frame = 0;
 
@@ -216,7 +215,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
     
     cells_reset_grid(cells_sensitive_grid);
-    cells_mark_rect(cells_sensitive_grid, cells_get_centered_rect(s_date_grid_sizing, cells_largest_rect));
+    cells_mark_rect(cells_sensitive_grid, cells_get_centered_rect(cells_largest_rect));
     cells_debug_print(cells_sensitive_grid);
   }
   
@@ -320,9 +319,6 @@ static void window_load(Window *window) {
   GRect bounds = layer_get_bounds(root);
   GPoint center = grect_center_point(&bounds);
   int16_t min_dim = min(bounds.size.w, bounds.size.h);
-  
-  // Initialize the occupied screen cell tracker
-  cells_init(center, min_dim, 15);
 
   // Fractal layer
   s_fractal_layer = layer_create(bounds);
@@ -340,13 +336,16 @@ static void window_load(Window *window) {
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  s_date_grid_sizing = (TextCellSizing) {
+  TextCellSizing date_sizing = (TextCellSizing) {
     .w_even = 6,
     .w_odd = 7,
     .h_even = 2,
     .h_odd = 1
   };
   layer_add_child(root, text_layer_get_layer(s_date_layer));
+  
+  // Initialize the occupied screen cell tracker
+  cells_init(center, min_dim, 20, date_sizing);
   
   // Initial date placement
   s_max_depth = MAX_RECURSION_DEPTH;
