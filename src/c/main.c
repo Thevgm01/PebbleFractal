@@ -184,50 +184,52 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   if (ctx != NULL) {
     graphics_context_set_antialiased(ctx, false);
     graphics_context_set_stroke_width(ctx, 1);
-    graphics_context_set_stroke_color(ctx, GColorDarkGray);
+    graphics_context_set_stroke_color(ctx, settings.SecondaryColor);
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
-  // Change the text every minute, or on first load
-  bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
-  if (update_date) {
-    static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-    text_layer_set_text(s_date_layer, date_buf);
-    s_date_rect.size = text_layer_get_content_size(s_date_layer);
-  }
-  
-  // Move the date if the fractal passed over it, or on first load
-  bool move_date = cells_sensitive_overwritten() || ctx == NULL;
-  if (move_date) {
-    // Calculate the largest rect (expensive!)
-    cells_update_largest_rect();
+  if (settings.ShowDate) {
+    // Change the text every minute, or on first load
+    bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
+    if (update_date) {
+      static char date_buf[16];
+      strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+      text_layer_set_text(s_date_layer, date_buf);
+      s_date_rect.size = text_layer_get_content_size(s_date_layer);
+    }
     
-    GRect largest_rect = cells_local_to_world(cells_largest_rect);
-    s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
-    
-    // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
-    // Probably needs to be adjusted per font size
-    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(s_date_rect.origin.x, s_date_rect.origin.y - 4, 100, 30));
-    
-    APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
-    
-    cells_reset_grid(cells_sensitive_grid);
-    cells_mark_text_rect(cells_sensitive_grid);
-    cells_debug_print(cells_sensitive_grid);
-  }
-  
-  #ifdef DRAW_GRID
-  if (ctx != NULL) {
-    if (!move_date)
+    // Move the date if the fractal passed over it, or on first load
+    bool move_date = cells_sensitive_overwritten() || ctx == NULL;
+    if (move_date) {
+      // Calculate the largest rect (expensive!)
       cells_update_largest_rect();
+      
+      GRect largest_rect = cells_local_to_world(cells_largest_rect);
+      s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
+      
+      // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
+      // Probably needs to be adjusted per font size
+      layer_set_frame(text_layer_get_layer(s_date_layer), GRect(s_date_rect.origin.x, s_date_rect.origin.y - 4, 100, 30));
+      
+      APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
+      
+      cells_reset_grid(cells_sensitive_grid);
+      cells_mark_text_rect(cells_sensitive_grid);
+      cells_debug_print(cells_sensitive_grid);
+    }
     
-    cells_debug_draw(ctx);
-    
-    graphics_context_set_stroke_color(ctx, GColorCyan);
-    graphics_draw_rect(ctx, s_date_rect);
+    #ifdef DRAW_GRID
+      if (ctx != NULL) {
+        if (!move_date)
+          cells_update_largest_rect();
+        
+        cells_debug_draw(ctx);
+        
+        graphics_context_set_stroke_color(ctx, GColorCyan);
+        graphics_draw_rect(ctx, s_date_rect);
+      }
+    #endif
   }
-  #endif
   
   // Reset the fractal grid so it can be written to again
   // TODO what about this one?
@@ -249,7 +251,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
     int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
     int16_t inner_r = outer_r - (is_hour ? 12 : 5);
 
-    graphics_context_set_stroke_color(ctx, is_hour ? GColorWhite : GColorLightGray);
+    graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
     graphics_draw_line(ctx,
                        point_on_circle(center, angle, inner_r),
@@ -283,12 +285,19 @@ static void animation_update_proc(Animation *animation, const AnimationProgress 
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Depth: %d\tprogress: %d", s_max_depth, s_length_mult_for_max_depth);
   layer_mark_dirty(s_fractal_layer);
 }
-static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
+
+static void animation_stop() {
   s_max_depth = MAX_RECURSION_DEPTH;
   s_length_mult_for_max_depth = 0;
   s_animation = NULL;
 }
+
+static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
+  animation_stop();
+}
+
 static AnimationImplementation s_animation_impl = { .update = animation_update_proc };
+
 static void start_animation() {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Starting animation");
   if (s_animation) animation_destroy(s_animation);
@@ -332,7 +341,7 @@ static void window_load(Window *window) {
   GRect date_rect = GRect(0, 0, 100, 30);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, GColorWhite);
+  text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   TextCellSizing date_sizing = (TextCellSizing) {
     .w_even = 6,
@@ -368,9 +377,54 @@ static void window_unload(Window *window) {
 
 // --- Initialization --- //
 
+static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
+  
+  Tuple *pc = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
+  if (pc) {
+    settings.PrimaryColor = GColorFromHEX(pc->value->int32);
+    text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
+  }
+  
+  Tuple *sc = dict_find(iterator, MESSAGE_KEY_SecondaryColor);
+  if (sc) {
+    settings.SecondaryColor = GColorFromHEX(sc->value->int32);
+  }
+  
+  Tuple *bc = dict_find(iterator, MESSAGE_KEY_BackgroundColor);
+  if (bc) {
+    settings.BackgroundColor = GColorFromHEX(bc->value->int32);
+    window_set_background_color(s_window, settings.BackgroundColor);
+  }
+  
+  Tuple *sd = dict_find(iterator, MESSAGE_KEY_ShowDate);
+  if (sd) {
+    bool date_turned_on = !settings.ShowDate && sd->value->int32 == 1;
+    settings.ShowDate = sd->value->int32 == 1;
+    layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate);
+    
+    if (date_turned_on) {
+      animation_stop();
+      fractal_update_proc(s_fractal_layer, NULL);
+    }
+  }
+  
+  if (pc || sc || bc) {
+    settings_save();
+  }
+}
+
 static void init(void) {
+  // Load settings
+  settings_load();
+  
+  // Register settings callbacks
+  app_message_register_inbox_received(settings_inbox_received_callback);
+  app_message_open(256, 0);
+  
+  // Create the main window
   s_window = window_create();
-  window_set_background_color(s_window, GColorBlack);
+  window_set_background_color(s_window, settings.BackgroundColor);
   window_set_window_handlers(s_window, (WindowHandlers){
     .load   = window_load,
     .unload = window_unload,

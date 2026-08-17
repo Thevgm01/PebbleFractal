@@ -38,7 +38,3 @@ static void settings_load() {
   settings_restore_default();
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
-
-static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
-  
-}
