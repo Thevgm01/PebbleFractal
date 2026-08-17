@@ -171,10 +171,10 @@ void cells_debug_print(int16_t grid[]) {
 
 // --- Largest rect caclulation --- //
 
-// Slightly prefer wider rects, even if they would otherwise have the same area as a tall rect
-// Strongly prefer rects that meet a minimum width and height
+// Prefer wider rects, even if they would otherwise have the same area as a tall rect
+// Strongly prefer rects that meet a minimum width and/or height
 static int16_t gsize_score(GSize size) {
-  return (size.w - 2) * size.h + (size.w >= 6 && size.h >= 2 ? 1000 : 0);
+  return size.w * (size.h + 6) + (size.w >= 6 ? 1000 : 0) + (size.h >= 2 ? 1000 : 0);
 }
 
 // Find the largest rect within a 1D histogram

@@ -344,7 +344,7 @@ static void window_load(Window *window) {
     .w_even = 6,
     .w_odd = 7,
     .h_even = 2,
-    .h_odd = 3
+    .h_odd = 1
   };
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
