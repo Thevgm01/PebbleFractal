@@ -1,11 +1,9 @@
 #pragma once
 #include <pebble.h>
 
-#define BITS 16
-
 GRect cells_largest_rect;
-static int16_t cells_occupied_grid[BITS];
-static int16_t cells_sensitive_grid[BITS];
+extern int16_t cells_occupied_grid[];
+extern int16_t cells_sensitive_grid[];
 
 void cells_init(GPoint center, int16_t diameter, int16_t inset);
 

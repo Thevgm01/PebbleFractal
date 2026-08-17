@@ -1,6 +1,8 @@
 #include <pebble.h>
 #include "cells.h"
-#include "math.h"
+#include "utility.h"
+
+#define BITS 16
 
 const int16_t default_grid[BITS] = { // 16x16 bit matrix
   #ifdef PBL_ROUND
@@ -40,6 +42,9 @@ const int16_t default_grid[BITS] = { // 16x16 bit matrix
   #endif
 };
 
+int16_t cells_occupied_grid[BITS];
+int16_t cells_sensitive_grid[BITS];
+
 GRect screen_region;
 
 static int16_t histogram_stack[BITS];
@@ -75,12 +80,27 @@ void cells_mark_point(int16_t grid[], GPoint world_pos) {
 }
 
 void cells_mark_rect(int16_t grid[], GRect world_rect) {
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Marking rect: ", world_rect);
+  
   GRect local_rect = cells_world_to_local(world_rect);
-  int16_t row = 0;
-  for (int16_t x = max(local_rect.origin.x, 0); x < min(local_rect.size.w, BITS); x++) {
-    row |= 1 << x;
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Converted to local grid: ", local_rect);
+
+  // If we're over the left edge, shrink size and shift to origin
+  if (local_rect.origin.x < 0) {
+    local_rect.size.w += local_rect.origin.x;
+    local_rect.origin.x = 0;
   }
-  for (int16_t y = max(local_rect.origin.y, 0); y < min(local_rect.size.h, BITS); y++) {
+  
+  // If we're over the right edge, shrink size
+  local_rect.size.w = min(BITS, local_rect.size.w);
+  
+  // This might fail if the size is exactly 16? Not 100% sure
+  int16_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
+  APP_LOG_BINARY(APP_LOG_LEVEL_DEBUG, "Row bits: ", row);
+  
+  // Fill out the rows
+  int16_t start_y = max(local_rect.origin.y, 0);
+  for (int16_t y = start_y; y < start_y + min(local_rect.size.h, BITS); y++) {
     grid[y] |= row;
   }
 }
@@ -102,8 +122,8 @@ GRect cells_world_to_local(GRect rect) {
 GRect cells_local_to_world(GRect rect) {
   return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x,
                rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y,
-               rect.size.w * screen_region.size.w / BITS + 2,
-               rect.size.h * screen_region.size.h / BITS + 2);
+               rect.size.w * screen_region.size.w / BITS,
+               rect.size.h * screen_region.size.h / BITS);
 }
 
 // --- Drawing --- //
@@ -135,16 +155,17 @@ void cells_debug_draw(GContext *ctx) {
 void cells_debug_print(int16_t grid[]) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Address of grid: 0x%x", grid);
   for (int16_t y = 0; y < BITS; y += 2) {
-    static char output[BITS * 3];
+    static char output_row[BITS * 3];
     for (int16_t x = 0; x < BITS; x++) {
-      bool upper = (grid[y] & (1 << x)) != 0;
-      bool lower = (grid[y + 1] & (1 << x)) != 0;
-      if (upper && lower) memcpy(&output[x * 3], "█", 3);
-      else if (upper) memcpy(&output[x * 3], "▀", 3);
-      else if (lower) memcpy(&output[x * 3], "▄", 3);
-      else memcpy(&output[x * 3], " ", 3); // Em Space
+      bool upper = grid[y] & (1 << x);
+      bool lower = grid[y + 1] & (1 << x);
+      
+      if (upper && lower) memcpy(&output_row[x * 3], "█", 3);
+      else if (upper) memcpy(&output_row[x * 3], "▀", 3);
+      else if (lower) memcpy(&output_row[x * 3], "▄", 3);
+      else memcpy(&output_row[x * 3], " ", 3); // Em Space
     }
-    APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, output_row);
   }
 }
 

@@ -1,7 +1,7 @@
 #include <pebble.h>
 #include "settings.h"
 #include "cells.h"
-#include "math.h"
+#include "utility.h"
 
 #define FASTMODE
 //#define SCREENSHOTMODE
@@ -31,6 +31,7 @@ static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 static bool s_mark_points;
+static GRect s_date_rect;
 
 static int16_t s_screenshot_frame = 0;
 
@@ -190,8 +191,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
   
-  cells_debug_print(cells_occupied_grid);
-  
   // Change the text every minute, or on first load
   bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
   if (update_date) {
@@ -208,10 +207,12 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_world(cells_largest_rect));
     layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
     GSize date_size = text_layer_get_content_size(s_date_layer);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Date overwritten: x: %d, y: %d, w: %d, h: %d", date_ul.x, date_ul.y, date_size.w, date_size.h);
+    s_date_rect = (GRect) { .origin = date_ul, .size = date_size };
+    APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
     
     cells_reset_grid(cells_sensitive_grid);
-    cells_mark_rect(cells_sensitive_grid, (GRect) { .origin = date_ul, .size = date_size });
+    cells_mark_rect(cells_sensitive_grid, s_date_rect);
+    cells_debug_print(cells_sensitive_grid);
   }
   
   #ifdef DRAW_GRID
@@ -220,6 +221,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       cells_update_largest_rect();
     
     cells_debug_draw(ctx);
+    
+    graphics_context_set_stroke_color(ctx, GColorCyan);
+    graphics_draw_rect(ctx, s_date_rect);
   }
   #endif
   
