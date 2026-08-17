@@ -17,6 +17,7 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset, TextCellSizing t
 void cells_reset_grid(int16_t grid[]);
 void cells_mark_point(int16_t grid[], GPoint world_pos);
 void cells_mark_rect(int16_t grid[], GRect local_rect);
+void cells_mark_text_rect(int16_t grid[]);
 bool cells_sensitive_overwritten();
 
 GRect cells_get_centered_rect(GRect reference_local_rect);

@@ -106,6 +106,14 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
   }
 }
 
+void cells_mark_text_rect(int16_t grid[]) {
+  GSize size = GSize(
+    is_even(cells_largest_rect.size.w) ? sizing.w_even : sizing.w_odd,
+    is_even(cells_largest_rect.size.h) ? sizing.h_even : sizing.h_odd);
+  GPoint origin = center_in_rect(size, cells_largest_rect);
+  cells_mark_rect(grid, (GRect) { .origin = origin, .size = size });
+}
+
 bool cells_sensitive_overwritten() {
   for (int16_t y = 0; y < BITS; y++)
     if (cells_occupied_grid[y] & cells_sensitive_grid[y] & ~default_grid[y])

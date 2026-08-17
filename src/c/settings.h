@@ -2,7 +2,7 @@
 
 #define SETTINGS_KEY 1
 
-typedef struct ClaySettings {
+typedef struct {
   GColor PrimaryColor;
   GColor SecondaryColor;
   GColor BackgroundColor;

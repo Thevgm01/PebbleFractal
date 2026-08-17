@@ -40,9 +40,6 @@ static int16_t s_screenshot_frame = 0;
 static GPoint add_to_gpoint(GPoint a, int16_t x, int16_t y) { return GPoint(a.x + x, a.y + y); }
 static GPoint add_gpoints(GPoint a, GPoint b) { return GPoint(a.x + b.x, a.y + b.y); }
 static GPoint sub_gpoints(GPoint a, GPoint b) { return GPoint(a.x - b.x, a.y - b.y); }
-static GPoint center_in_rect(GSize size, GRect rect) {
-  return GPoint(rect.origin.x + (rect.size.w - size.w) / 2, rect.origin.y + (rect.size.h - size.h) / 2);
-}
 
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
@@ -203,6 +200,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Move the date if the fractal passed over it, or on first load
   bool move_date = cells_sensitive_overwritten() || ctx == NULL;
   if (move_date) {
+    // Calculate the largest rect (expensive!)
     cells_update_largest_rect();
     
     GRect largest_rect = cells_local_to_world(cells_largest_rect);
@@ -215,7 +213,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
     
     cells_reset_grid(cells_sensitive_grid);
-    cells_mark_rect(cells_sensitive_grid, cells_get_centered_rect(cells_largest_rect));
+    cells_mark_text_rect(cells_sensitive_grid);
     cells_debug_print(cells_sensitive_grid);
   }
   
