@@ -197,6 +197,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     static char date_buf[16];
     strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
     text_layer_set_text(s_date_layer, date_buf);
+    s_date_rect.size = text_layer_get_content_size(s_date_layer);
   }
   
   // Move the date if the fractal passed over it, or on first load
@@ -204,10 +205,17 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   if (move_date) {
     cells_update_largest_rect();
     
-    GPoint date_ul = center_in_rect(GSize(70, 20), cells_local_to_world(cells_largest_rect));
-    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(date_ul.x, date_ul.y, 70, 20));
-    GSize date_size = text_layer_get_content_size(s_date_layer);
-    s_date_rect = (GRect) { .origin = date_ul, .size = date_size };
+    GRect largest_rect = cells_local_to_world(cells_largest_rect);
+    s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
+    
+    // The text seems to appear at the bottom of the reported rect, so manually shift the rect up a bit
+    // Probably needs to be adjusted per font size
+    s_date_rect.origin.y -= 4;
+    layer_set_frame(text_layer_get_layer(s_date_layer), (GRect) { .origin = s_date_rect.origin, .size = GSize(100, 30) });
+    
+    // Shift it back down for grid calculations
+    s_date_rect.origin.y += 4;
+    
     APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
     
     cells_reset_grid(cells_sensitive_grid);
@@ -330,12 +338,11 @@ static void window_load(Window *window) {
   layer_add_child(root, s_notch_layer);
   
   // Text layer
-  GRect date_rect = GRect(0, 0, 100, 100);
+  GRect date_rect = GRect(0, 0, 100, 30);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Initial date placement
