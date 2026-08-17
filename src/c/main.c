@@ -208,13 +208,9 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     GRect largest_rect = cells_local_to_world(cells_largest_rect);
     s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
     
-    // The text seems to appear at the bottom of the reported rect, so manually shift the rect up a bit
+    // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
     // Probably needs to be adjusted per font size
-    s_date_rect.origin.y -= 4;
-    layer_set_frame(text_layer_get_layer(s_date_layer), (GRect) { .origin = s_date_rect.origin, .size = GSize(100, 30) });
-    
-    // Shift it back down for grid calculations
-    s_date_rect.origin.y += 4;
+    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(s_date_rect.origin.x, s_date_rect.origin.y - 4, 100, 30));
     
     APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
     

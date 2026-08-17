@@ -113,17 +113,17 @@ bool cells_sensitive_overwritten() {
 }
 
 GRect cells_world_to_local(GRect rect) {
-  return GRect((rect.origin.x - screen_region.origin.x) * BITS / screen_region.size.w,
-               (rect.origin.y - screen_region.origin.y) * BITS / screen_region.size.h,
-               rect.size.w * BITS / screen_region.size.w,
-               rect.size.h * BITS / screen_region.size.h);
+  return GRect((rect.origin.x - screen_region.origin.x + 2) * BITS / screen_region.size.w,
+               (rect.origin.y - screen_region.origin.y + 2) * BITS / screen_region.size.h,
+               (rect.size.w + 8) * BITS / screen_region.size.w,
+               (rect.size.h + 12) * BITS / screen_region.size.h);
 }
 
 GRect cells_local_to_world(GRect rect) {
   return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x,
                rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y,
-               rect.size.w * screen_region.size.w / BITS,
-               rect.size.h * screen_region.size.h / BITS);
+               rect.size.w * screen_region.size.w / BITS + 2,
+               rect.size.h * screen_region.size.h / BITS + 2);
 }
 
 // --- Drawing --- //
