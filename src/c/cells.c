@@ -79,12 +79,9 @@ void cells_mark_point(int16_t grid[], GPoint world_pos) {
   }
 }
 
-void cells_mark_rect(int16_t grid[], GRect world_rect) {
-  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Marking rect: ", world_rect);
+void cells_mark_rect(int16_t grid[], GRect local_rect) {
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Marking rect: ", local_rect);
   
-  GRect local_rect = cells_world_to_local(world_rect);
-  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Converted to local grid: ", local_rect);
-
   // If we're over the left edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {
     local_rect.size.w += local_rect.origin.x;
@@ -112,11 +109,14 @@ bool cells_sensitive_overwritten() {
   return false;
 }
 
-GRect cells_world_to_local(GRect rect) {
-  return GRect((rect.origin.x - screen_region.origin.x + 2) * BITS / screen_region.size.w,
-               (rect.origin.y - screen_region.origin.y + 2) * BITS / screen_region.size.h,
-               (rect.size.w + 8) * BITS / screen_region.size.w,
-               (rect.size.h + 12) * BITS / screen_region.size.h);
+GRect cells_get_centered_rect(TextCellSizing sizing, GRect reference_local_rect) {
+  GSize size = GSize(
+    reference_local_rect.size.w % 2 == 0 ? sizing.w_even : sizing.w_odd,
+    reference_local_rect.size.h % 2 == 0 ? sizing.h_even : sizing.h_odd);
+  GPoint origin = GPoint(
+    reference_local_rect.origin.x + (reference_local_rect.size.w - size.w) / 2,
+    reference_local_rect.origin.y + (reference_local_rect.size.h - size.h) / 2);
+  return (GRect) { .origin = origin, .size = size };
 }
 
 GRect cells_local_to_world(GRect rect) {
