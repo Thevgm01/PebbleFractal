@@ -193,6 +193,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
   
+  // Move/update date
   if (settings.ShowDate) {
     // Change the text every minute, or on first load
     bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
@@ -314,6 +315,41 @@ static void start_animation() {
   animation_schedule(s_animation);
 }
 
+// --- Settings --- //
+
+static void post_settings_loaded() {
+  text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
+  window_set_background_color(s_window, settings.BackgroundColor);
+  layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
+  
+  if (settings.ShowDate) {
+    animation_stop();
+    fractal_update_proc(s_fractal_layer, NULL);
+  }
+
+  s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
+}
+
+static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
+  
+  #define LOAD_COLOR(var, key) (var) = (GColorFromHEX(dict_find(iterator, key)->value->int32))
+  #define LOAD_INT(var, key) (var) = (dict_find(iterator, key)->value->int32)
+  #define LOAD_BOOL(var, key) (var) = (dict_find(iterator, key)->value->int32 == 1)
+  
+  LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
+  LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
+  LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
+  LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
+  LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
+  LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
+  LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
+  
+  settings_save();
+  
+  post_settings_loaded();
+}
+
 // --- Window --- //
 
 static void focus_handler(bool focus) {
@@ -346,7 +382,6 @@ static void window_load(Window *window) {
   GRect date_rect = GRect(0, 0, 100, 30);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   TextCellSizing date_sizing = (TextCellSizing) {
     .w_even = 6,
@@ -358,11 +393,11 @@ static void window_load(Window *window) {
   
   // Initialize the occupied screen cell tracker
   cells_init(center, min_dim, 20, date_sizing);
-  
-  // Initial date placement
-  s_max_depth = MAX_RECURSION_DEPTH;
-  fractal_update_proc(s_fractal_layer, NULL);
 
+  // Load settings
+  settings_load();
+  post_settings_loaded();
+  
   #ifndef SCREENSHOTMODE
   // Animation stuff
   s_max_depth = 0;
@@ -382,45 +417,7 @@ static void window_unload(Window *window) {
 
 // --- Initialization --- //
 
-static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
-  
-  Tuple *t;
-  
-  t = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
-  settings.PrimaryColor = GColorFromHEX(t->value->int32);
-  text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
-  
-  settings.SecondaryColor = GColorFromHEX(dict_find(iterator, MESSAGE_KEY_SecondaryColor)->value->int32);
-  
-  t = dict_find(iterator, MESSAGE_KEY_BackgroundColor);
-  settings.BackgroundColor = GColorFromHEX(t->value->int32);
-  window_set_background_color(s_window, settings.BackgroundColor);
-  
-  t = dict_find(iterator, MESSAGE_KEY_ShowDate);
-  bool date_turned_on = !settings.ShowDate && t->value->int32 == 1;
-  settings.ShowDate = t->value->int32 == 1;
-  layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate);
-  if (date_turned_on) {
-    animation_stop();
-    fractal_update_proc(s_fractal_layer, NULL);
-  }
-  
-  settings.MinuteHandLength = dict_find(iterator, MESSAGE_KEY_MinuteHandLength)->value->int32;
-  
-  settings.HourHandLength = dict_find(iterator, MESSAGE_KEY_HourHandLength)->value->int32;
-  s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", s_hour_hand_scale);
-  
-  settings.RecurseScale = dict_find(iterator, MESSAGE_KEY_RecurseScale)->value->int32;
-  
-  settings_save();
-}
-
-static void init(void) {
-  // Load settings
-  settings_load();
-  
+static void init(void) {  
   // Register settings callbacks
   app_message_register_inbox_received(settings_inbox_received_callback);
   app_message_open(256, 0);
@@ -434,8 +431,8 @@ static void init(void) {
   });
   window_stack_push(s_window, true);
 
-  // Subscribe to ticks every second
-  // Even though we only have a minute-hand, the fractal can move a lot with only small inputs
+  // The fractal can change a lot over a short time,
+  // so tick every second even though we only have a minute hand
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
 }
 
