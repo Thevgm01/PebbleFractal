@@ -23,7 +23,9 @@
             "RecurseScale",
             "WidthScale",
             "FirstHandScale",
-            "FontSize"
+            "FontSize",
+            "DebugGrid",
+            "DebugSpeed"
         ],
         "projectType": "native",
         "resources": {

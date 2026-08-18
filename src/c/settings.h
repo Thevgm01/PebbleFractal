@@ -13,6 +13,8 @@ typedef struct {
   int16_t WidthScale;
   int16_t FirstHandScale;
   int16_t FontSize;
+  bool DebugGrid;
+  bool DebugSpeed;
 } ClaySettings;
 
 static ClaySettings settings;
@@ -24,10 +26,10 @@ static void settings_restore_default() {
   settings.ShowDate = true;
   settings.MinuteHandLength = 60;
   settings.HourHandLength = 40;
-  settings.RecurseScale = 18;
+  settings.RecurseScale = 80;
   settings.WidthScale = 0;
   settings.FirstHandScale = 1;
-  settings.FontSize = 14;
+  settings.FontSize = 18;
 }
 
 static void settings_save() {

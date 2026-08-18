@@ -9,30 +9,33 @@
 //#define CIRCLES
 #define DRAW_GRID
 
-#define MINUTE_HAND_LENGTH 60
 #define TRUE_HAND_MULT 150 / 100
-#define HOUR_HAND_SCALE 70 / 100
 #define THICKNESS_MULT 0 / 100
-#define RECURSE_SCALE 80 / 100
 
 #define MAX_RECURSION_DEPTH 13
 
 // --- Static Variables --- //
+
+// Windows
 static Window *s_window;
 static Layer *s_fractal_layer;
 static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
 
+// Animation
 static Animation *s_animation;
 static int8_t s_max_depth;
 static int16_t s_length_mult_for_max_depth;
 
+// Fractal drawing
+static int16_t s_hour_hand_scale;
 static int16_t s_hour_angle;
 static int16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 static bool s_mark_points;
 static GRect s_date_rect;
 
+// Screenshot mode
 static int16_t s_screenshot_frame = 0;
 
 // --- Drawing Functions --- //
@@ -65,12 +68,12 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int16_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
   GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
-  GPoint hour_point = point_on_circle(origin, new_hour_angle, length * HOUR_HAND_SCALE);
+  GPoint hour_point = point_on_circle(origin, new_hour_angle, length * s_hour_hand_scale / 100);
   
   // Recurse before drawing so that earlier branches appear on top
   if (depth < s_max_depth) {
-    draw_hands_recursive(minute_point, new_minute_angle, length * RECURSE_SCALE, depth + 1);
-    draw_hands_recursive(hour_point, new_hour_angle, length * HOUR_HAND_SCALE * RECURSE_SCALE, depth + 1);
+    draw_hands_recursive(minute_point, new_minute_angle, length * settings.RecurseScale / 100, depth + 1);
+    draw_hands_recursive(hour_point, new_hour_angle, length * s_hour_hand_scale * settings.RecurseScale / 10000, depth + 1);
   }
   
   // Mark the next points occupied for determining the date placement
@@ -119,12 +122,14 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
         
         // Draw additional long lines for the true hands
         if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
-          int16_t true_hand_length = MINUTE_HAND_LENGTH * TRUE_HAND_MULT - MINUTE_HAND_LENGTH;
+          int16_t true_hand_length = settings.MinuteHandLength * TRUE_HAND_MULT - settings.MinuteHandLength;
           if (s_max_depth == 1) {
             true_hand_length = true_hand_length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
           }
-          graphics_draw_line(s_fractal_ctx, minute_point, point_on_circle(origin, s_minute_angle, length + true_hand_length));
-          graphics_draw_line(s_fractal_ctx, hour_point, point_on_circle(origin, s_hour_angle, (length + true_hand_length) * HOUR_HAND_SCALE));
+          graphics_draw_line(s_fractal_ctx, minute_point,
+                             point_on_circle(origin, s_minute_angle, length + true_hand_length));
+          graphics_draw_line(s_fractal_ctx, hour_point,
+                             point_on_circle(origin, s_hour_angle, (length + true_hand_length) * s_hour_hand_scale / 100));
         }
       }
       // Draw the sides of the clock hands
@@ -186,7 +191,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_stroke_width(ctx, 1);
     graphics_context_set_stroke_color(ctx, settings.SecondaryColor);
   }
-  draw_hands_recursive(center, 0, MINUTE_HAND_LENGTH, 0);
+  draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
   
   if (settings.ShowDate) {
     // Change the text every minute, or on first load
@@ -380,38 +385,36 @@ static void window_unload(Window *window) {
 static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
   
-  Tuple *pc = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
-  if (pc) {
-    settings.PrimaryColor = GColorFromHEX(pc->value->int32);
-    text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
+  Tuple *t;
+  
+  t = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
+  settings.PrimaryColor = GColorFromHEX(t->value->int32);
+  text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
+  
+  settings.SecondaryColor = GColorFromHEX(dict_find(iterator, MESSAGE_KEY_SecondaryColor)->value->int32);
+  
+  t = dict_find(iterator, MESSAGE_KEY_BackgroundColor);
+  settings.BackgroundColor = GColorFromHEX(t->value->int32);
+  window_set_background_color(s_window, settings.BackgroundColor);
+  
+  t = dict_find(iterator, MESSAGE_KEY_ShowDate);
+  bool date_turned_on = !settings.ShowDate && t->value->int32 == 1;
+  settings.ShowDate = t->value->int32 == 1;
+  layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate);
+  if (date_turned_on) {
+    animation_stop();
+    fractal_update_proc(s_fractal_layer, NULL);
   }
   
-  Tuple *sc = dict_find(iterator, MESSAGE_KEY_SecondaryColor);
-  if (sc) {
-    settings.SecondaryColor = GColorFromHEX(sc->value->int32);
-  }
+  settings.MinuteHandLength = dict_find(iterator, MESSAGE_KEY_MinuteHandLength)->value->int32;
   
-  Tuple *bc = dict_find(iterator, MESSAGE_KEY_BackgroundColor);
-  if (bc) {
-    settings.BackgroundColor = GColorFromHEX(bc->value->int32);
-    window_set_background_color(s_window, settings.BackgroundColor);
-  }
+  settings.HourHandLength = dict_find(iterator, MESSAGE_KEY_HourHandLength)->value->int32;
+  s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", s_hour_hand_scale);
   
-  Tuple *sd = dict_find(iterator, MESSAGE_KEY_ShowDate);
-  if (sd) {
-    bool date_turned_on = !settings.ShowDate && sd->value->int32 == 1;
-    settings.ShowDate = sd->value->int32 == 1;
-    layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate);
-    
-    if (date_turned_on) {
-      animation_stop();
-      fractal_update_proc(s_fractal_layer, NULL);
-    }
-  }
+  settings.RecurseScale = dict_find(iterator, MESSAGE_KEY_RecurseScale)->value->int32;
   
-  if (pc || sc || bc) {
-    settings_save();
-  }
+  settings_save();
 }
 
 static void init(void) {

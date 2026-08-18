@@ -99,7 +99,7 @@ module.exports = [
         "messageKey": "WidthScale",
         "label": "Width Scale",
         "defaultValue": 0,
-        "description": "Optionally make the hands get thicker the higher up they are",
+        "description": "Optionally make the hands appear thicker the \"higher up\" they are",
         "min": 0,
         "max": 1,
         "step": 0.05
@@ -113,6 +113,29 @@ module.exports = [
         "min": 1,
         "max": 3,
         "step": 0.25
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Debug"
+      },
+      {
+        "type": "toggle",
+        "messageKey": "DebugSpeed",
+        "defaultValue": false,
+        "label": "Fastmode",
+        "description": "Time passes 60x faster"
+      },
+      {
+        "type": "toggle",
+        "messageKey": "DebugGrid",
+        "defaultValue": false,
+        "label": "Show Grid",
+        "description": "Show the grid used to calculate date placement"
       }
     ]
   },
