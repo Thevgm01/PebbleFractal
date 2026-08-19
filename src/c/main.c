@@ -136,7 +136,6 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
 
     // Draw additional long lines for the true hands
     if (settings.FirstHandScale > 0 && s_max_depth >= 1) {
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", settings.FirstHandScale);
       int16_t true_hand_length = settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength;
       if (s_max_depth == 1) SCALE_WITH_ANIMATION(true_hand_length);
       graphics_draw_line(s_fractal_ctx, minute_point,
@@ -190,8 +189,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Move/update date
   if (settings.ShowDate) {
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", s_animation);
-
     // Change the text every minute, or on first load
     bool update_date = (!s_animation && t->tm_sec == 0) || ctx == NULL;
     if (update_date) {
@@ -217,7 +214,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
       cells_reset_grid(cells_sensitive_grid);
-      cells_mark_text_rect(cells_sensitive_grid);
+      cells_mark_text_rect(cells_sensitive_grid, s_date_rect);
       //cells_debug_print(cells_sensitive_grid);
     }
     
@@ -414,7 +411,7 @@ static void init(void) {
   s_window = window_create();
   window_set_background_color(s_window, settings.BackgroundColor);
   window_set_window_handlers(s_window, (WindowHandlers){
-    .load   = window_load,
+    .load = window_load,
     .unload = window_unload,
   });
   window_stack_push(s_window, true);

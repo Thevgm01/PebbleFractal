@@ -93,7 +93,7 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
   }
   
   // If we're over the right edge, shrink size
-  local_rect.size.w = min(BITS, local_rect.size.w);
+  local_rect.size.w = min(BITS - 1, local_rect.size.w) + 1;
   
   // This might fail if the size is exactly 16? Not 100% sure
   int16_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
@@ -101,17 +101,32 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
   
   // Fill out the rows
   int16_t start_y = max(local_rect.origin.y, 0);
-  for (int16_t y = start_y; y < start_y + min(local_rect.size.h, BITS); y++) {
+  for (int16_t y = start_y; y <= start_y + min(local_rect.size.h, BITS - 1); y++) {
     grid[y] |= row;
   }
 }
 
-void cells_mark_text_rect(int16_t grid[]) {
-  GSize size = GSize(
-    is_even(cells_largest_rect.size.w) ? sizing.w_even : sizing.w_odd,
-    is_even(cells_largest_rect.size.h) ? sizing.h_even : sizing.h_odd);
-  GPoint origin = center_in_rect(size, cells_largest_rect);
-  cells_mark_rect(grid, (GRect) { .origin = origin, .size = size });
+void cells_mark_text_rect(int16_t grid[], GRect text_rect) {  
+  #define to_local(pos) GPoint( \
+    (pos.x - screen_region.origin.x) * BITS / screen_region.size.w, \
+    (pos.y - screen_region.origin.y) * BITS / screen_region.size.h)
+  
+  int16_t half_cell_width = screen_region.size.w / BITS / 2;
+  text_rect = grect_crop(text_rect, 2);
+  GPoint lr = GPoint(text_rect.origin.x + text_rect.size.w, text_rect.origin.y + text_rect.size.h);
+  
+  GPoint local_ul = to_local(text_rect.origin);
+  GPoint local_lr = to_local(lr);
+  
+  GRect local_rect = GRect(
+    local_ul.x,
+    local_ul.y,
+    local_lr.x - local_ul.x,
+    local_lr.y - local_ul.y);
+  
+  //cells_mark_point(grid, text_rect.origin);
+  //cells_mark_point(grid, lr);
+  cells_mark_rect(grid, local_rect);
 }
 
 bool cells_sensitive_overwritten() {
@@ -144,6 +159,24 @@ void cells_debug_draw(GContext *ctx) {
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
+      graphics_context_set_stroke_color(ctx, 
+        (default_grid[y] & (1 << x)) != 0 ? GColorBlue 
+        : (cells_occupied_grid[y] & (1 << x)) != 0 ? GColorPurple
+        : (cells_sensitive_grid[y] & (1 << x)) != 0 ? GColorRed
+        : GColorGreen);
+      
+      graphics_draw_line(ctx,
+        GPoint(screen_region.origin.x + x * screen_region.size.w / BITS, 
+               screen_region.origin.y + y * screen_region.size.h / BITS),
+        GPoint(screen_region.origin.x + (x + 1) * screen_region.size.w / BITS, 
+               screen_region.origin.y + (y + 1) * screen_region.size.h / BITS));
+      
+      graphics_draw_line(ctx,
+        GPoint(screen_region.origin.x + x * screen_region.size.w / BITS, 
+               screen_region.origin.y + (y + 1) * screen_region.size.h / BITS),
+        GPoint(screen_region.origin.x + (x + 1) * screen_region.size.w / BITS, 
+               screen_region.origin.y + y * screen_region.size.h / BITS));
+      /*
       GPoint point = GPoint(
         screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
         screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2);
@@ -157,6 +190,7 @@ void cells_debug_draw(GContext *ctx) {
         graphics_context_set_stroke_color(ctx, cell_filled ? GColorRed : GColorGreen);
         graphics_draw_pixel(ctx, point);
       }
+      */
     }
   }
   // Draw the largest rectangle
