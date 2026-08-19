@@ -89,7 +89,7 @@ module.exports = [
         "type": "slider",
         "messageKey": "RecurseScale",
         "label": "Recurse Scale",
-        "defaultValue": 0.9,
+        "defaultValue": 0.8,
         "min": 0,
         "max": 1,
         "step": 0.05
@@ -101,7 +101,7 @@ module.exports = [
         "defaultValue": 0,
         "description": "Optionally make the hands appear thicker the \"higher up\" they are",
         "min": 0,
-        "max": 1,
+        "max": 0.5,
         "step": 0.05
       },
       {

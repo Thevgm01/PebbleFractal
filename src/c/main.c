@@ -3,14 +3,9 @@
 #include "cells.h"
 #include "utility.h"
 
-#define FASTMODE
 //#define SCREENSHOTMODE
 //#define RANDOM
 //#define CIRCLES
-#define DRAW_GRID
-
-#define TRUE_HAND_MULT 150 / 100
-#define THICKNESS_MULT 0 / 100
 
 #define MAX_RECURSION_DEPTH 13
 
@@ -56,9 +51,11 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 }
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
+  #define SCALE_WITH_ANIMATION(var) (var) = \
+    (var * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX)
+  
   // Animate the length per depth
-  if (depth == s_max_depth)
-    length = length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
+  if (depth == s_max_depth) SCALE_WITH_ANIMATION(length);
   
   // Early return if our length is zero (nothing to draw)
   if (length == 0)
@@ -70,24 +67,24 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
   GPoint hour_point = point_on_circle(origin, new_hour_angle, length * s_hour_hand_scale / 100);
   
-  // Recurse before drawing so that earlier branches appear on top
-  if (depth < s_max_depth) {
-    draw_hands_recursive(minute_point, new_minute_angle, length * settings.RecurseScale / 100, depth + 1);
-    draw_hands_recursive(hour_point, new_hour_angle, length * s_hour_hand_scale * settings.RecurseScale / 10000, depth + 1);
-  }
-  
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
     cells_mark_point(cells_occupied_grid, minute_point);
     cells_mark_point(cells_occupied_grid, hour_point);
   }
   
+  // Recurse before drawing so that earlier branches appear on top
+  if (depth < s_max_depth) {
+    draw_hands_recursive(minute_point, new_minute_angle, length * settings.RecurseScale / 100, depth + 1);
+    draw_hands_recursive(hour_point, new_hour_angle, length * s_hour_hand_scale * settings.RecurseScale / 10000, depth + 1);
+  }
+    
   // Return if we have no context to draw to (will only happen during the first run for initial date placement)
   if (s_fractal_ctx == NULL)
     return;
   
   // Determine line width (can be zero, which will draw a 1-pixel line)
-  int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * THICKNESS_MULT;
+  int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * settings.WidthScale / 100;
   
   // Make the hands white for the uppermost layer
   if (depth == 0)
@@ -115,23 +112,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
       int16_t next_half_width = half_width - 1;
       int16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
       int16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
-      
-      if (depth == 0) {
-        // Draw a circle at the very center
-        graphics_draw_circle(s_fractal_ctx, origin, half_width);
-        
-        // Draw additional long lines for the true hands
-        if (TRUE_HAND_MULT > 0 && s_max_depth >= 1) {
-          int16_t true_hand_length = settings.MinuteHandLength * TRUE_HAND_MULT - settings.MinuteHandLength;
-          if (s_max_depth == 1) {
-            true_hand_length = true_hand_length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
-          }
-          graphics_draw_line(s_fractal_ctx, minute_point,
-                             point_on_circle(origin, s_minute_angle, length + true_hand_length));
-          graphics_draw_line(s_fractal_ctx, hour_point,
-                             point_on_circle(origin, s_hour_angle, (length + true_hand_length) * s_hour_hand_scale / 100));
-        }
-      }
+
       // Draw the sides of the clock hands
       graphics_draw_line(s_fractal_ctx, // Left minute line
                          point_on_circle(origin, minute_normal_angle, half_width), 
@@ -146,6 +127,24 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
     }
+  
+  if (depth == 0) {
+    if (half_width > 1) {
+      // Draw a circle at the very center
+      graphics_draw_circle(s_fractal_ctx, origin, half_width);
+    }
+
+    // Draw additional long lines for the true hands
+    if (settings.FirstHandScale > 0 && s_max_depth >= 1) {
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", settings.FirstHandScale);
+      int16_t true_hand_length = settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength;
+      if (s_max_depth == 1) SCALE_WITH_ANIMATION(true_hand_length);
+      graphics_draw_line(s_fractal_ctx, minute_point,
+                         point_on_circle(origin, s_minute_angle, length + true_hand_length));
+      graphics_draw_line(s_fractal_ctx, hour_point,
+                         point_on_circle(origin, s_hour_angle, (length + true_hand_length) * s_hour_hand_scale / 100));
+    }
+  }
   #endif
 }
 
@@ -156,13 +155,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Current time
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
-  
-  // Check if we need to move the date twice per minute, or on first load
-  s_mark_points = (s_animation == NULL && t->tm_sec % 30 == 0) || ctx == NULL;
-  
-  // TODO do we need this?
-  if (s_mark_points)
-    cells_reset_grid(cells_occupied_grid);
   
   // Convert to angle
   #ifdef RANDOM
@@ -177,12 +169,15 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   #else
     s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
     s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
-    #ifdef FASTMODE
+    if (settings.DebugSpeed) {
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
-      s_mark_points = true;
-    #endif
+    }
   #endif
+  
+  // Check if we need to move the date twice per minute, or on first load
+  s_mark_points = (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)) || ctx == NULL;
+  if (s_mark_points) cells_reset_grid(cells_occupied_grid);
   
   // Draw fractal
   s_fractal_ctx = ctx;
@@ -195,8 +190,10 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Move/update date
   if (settings.ShowDate) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", s_animation);
+
     // Change the text every minute, or on first load
-    bool update_date = (s_animation == NULL && t->tm_sec == 0) || ctx == NULL;
+    bool update_date = (!s_animation && t->tm_sec == 0) || ctx == NULL;
     if (update_date) {
       static char date_buf[16];
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
@@ -214,32 +211,26 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
       
       // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
-      // Probably needs to be adjusted per font size
+      // Probably needs to be adjusted on a per-font-basis
       layer_set_frame(text_layer_get_layer(s_date_layer), GRect(s_date_rect.origin.x, s_date_rect.origin.y - 4, 100, 30));
       
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
       cells_reset_grid(cells_sensitive_grid);
       cells_mark_text_rect(cells_sensitive_grid);
-      cells_debug_print(cells_sensitive_grid);
+      //cells_debug_print(cells_sensitive_grid);
     }
     
-    #ifdef DRAW_GRID
-      if (ctx != NULL) {
-        if (!move_date)
-          cells_update_largest_rect();
-        
-        cells_debug_draw(ctx);
-        
-        graphics_context_set_stroke_color(ctx, GColorCyan);
-        graphics_draw_rect(ctx, s_date_rect);
-      }
-    #endif
+    if (settings.DebugGrid && ctx != NULL) {
+      if (!move_date)
+        cells_update_largest_rect();
+
+      cells_debug_draw(ctx);
+
+      graphics_context_set_stroke_color(ctx, GColorCyan);
+      graphics_draw_rect(ctx, s_date_rect);
+    }
   }
-  
-  // Reset the fractal grid so it can be written to again
-  // TODO what about this one?
-  cells_reset_grid(cells_occupied_grid);
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -268,38 +259,30 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  #ifdef FASTMODE
+  // Redraw the fractal every 10 seconds
+  if (settings.DebugSpeed || tick_time->tm_sec % 10 == 0) {
+
+    #ifdef SCREENSHOTMODE
+    s_screenshot_frame = (s_screenshot_frame + 1) % 60;
+    #endif
+
     layer_mark_dirty(s_fractal_layer);
-  #else
-    // Redraw the fractal every 10 seconds
-    if (tick_time->tm_sec % 10 == 0) {
-      
-      #ifdef SCREENSHOTMODE
-        s_screenshot_frame = (s_screenshot_frame + 1) % 60;
-      #endif
-      
-      layer_mark_dirty(s_fractal_layer);
-    }
-  #endif
+  }
 }
 
 // --- Animation --- //
 
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
-  s_max_depth = progress * MAX_RECURSION_DEPTH / (ANIMATION_NORMALIZED_MAX + 1);
-  s_length_mult_for_max_depth = progress - (s_max_depth * (ANIMATION_NORMALIZED_MAX + 1) / MAX_RECURSION_DEPTH);
+  s_max_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
+  s_length_mult_for_max_depth = progress - (s_max_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Depth: %d\tprogress: %d", s_max_depth, s_length_mult_for_max_depth);
   layer_mark_dirty(s_fractal_layer);
 }
 
-static void animation_stop() {
+static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
   s_max_depth = MAX_RECURSION_DEPTH;
   s_length_mult_for_max_depth = 0;
   s_animation = NULL;
-}
-
-static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
-  animation_stop();
 }
 
 static AnimationImplementation s_animation_impl = { .update = animation_update_proc };
@@ -323,7 +306,7 @@ static void post_settings_loaded() {
   layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
   
   if (settings.ShowDate) {
-    animation_stop();
+    animation_stopped_proc(s_animation, false, NULL);
     fractal_update_proc(s_fractal_layer, NULL);
   }
 
@@ -344,6 +327,11 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
   LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
+  LOAD_INT(settings.WidthScale, MESSAGE_KEY_WidthScale);
+  LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
+  LOAD_INT(settings.FontSize, MESSAGE_KEY_FontSize);
+  LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
+  LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
   
   settings_save();
   
