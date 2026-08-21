@@ -70,8 +70,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    cells_mark_point(cells_occupied_grid, minute_point);
-    cells_mark_point(cells_occupied_grid, hour_point);
+    cells_mark_point(cells_grids.fractal, minute_point);
+    cells_mark_point(cells_grids.fractal, hour_point);
   }
   
   // Recurse before drawing so that earlier branches appear on top
@@ -177,7 +177,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Check if we need to move the date twice per minute, or on first load
   s_mark_points = (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)) || ctx == NULL;
-  if (s_mark_points) cells_reset_grid(cells_occupied_grid);
+  if (s_mark_points) cells_reset_grid(cells_grids.fractal);
   
   // Draw fractal
   s_fractal_ctx = ctx;
@@ -219,8 +219,8 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
-      cells_reset_grid(cells_sensitive_grid);
-      cells_mark_rect(cells_sensitive_grid, cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)));
+      cells_reset_grid(cells_grids.sensitive);
+      cells_mark_rect(cells_grids.sensitive, cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)));
       //cells_debug_print(cells_sensitive_grid);
     }
     
@@ -328,6 +328,10 @@ static void focus_handler(bool focus) {
   }
 }
 
+static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx) {
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "unobstructed area: ", final_unobstructed_screen_area);
+}
+
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
@@ -353,6 +357,22 @@ static void window_load(Window *window) {
   
   // Initialize the occupied screen cell tracker
   cells_init(center, min_dim, 20);
+  cells_grids.base[0]  = PBL_IF_ROUND_ELSE(0b1111100000011111, 0b1111000000001111);
+  cells_grids.base[1]  = PBL_IF_ROUND_ELSE(0b1110000000000111, 0b1000000000000001);
+  cells_grids.base[2]  = PBL_IF_ROUND_ELSE(0b1100000000000011, 0b1000000000000001);
+  cells_grids.base[3]  = PBL_IF_ROUND_ELSE(0b1000000000000001, 0b1000000000000001);
+  cells_grids.base[4]  = PBL_IF_ROUND_ELSE(0b1000000000000001, 0b0000000000000000);
+  cells_grids.base[5]  = PBL_IF_ROUND_ELSE(0b0000000000000000, 0b0000000000000000);
+  cells_grids.base[6]  = PBL_IF_ROUND_ELSE(0b0000000000000000, 0b0000000000000000);
+  cells_grids.base[7]  = PBL_IF_ROUND_ELSE(0b0000000110000000, 0b0000000110000000);
+  cells_grids.base[8]  = PBL_IF_ROUND_ELSE(0b0000000110000000, 0b0000000110000000);
+  cells_grids.base[9]  = PBL_IF_ROUND_ELSE(0b0000000000000000, 0b0000000000000000);
+  cells_grids.base[10] = PBL_IF_ROUND_ELSE(0b0000000000000000, 0b0000000000000000);
+  cells_grids.base[11] = PBL_IF_ROUND_ELSE(0b1000000000000001, 0b0000000000000000);
+  cells_grids.base[12] = PBL_IF_ROUND_ELSE(0b1000000000000001, 0b1000000000000001);
+  cells_grids.base[13] = PBL_IF_ROUND_ELSE(0b1100000000000011, 0b1000000000000001);
+  cells_grids.base[14] = PBL_IF_ROUND_ELSE(0b1110000000000111, 0b1000000000000001);
+  cells_grids.base[15] = PBL_IF_ROUND_ELSE(0b1111100000011111, 0b1111000000001111);
 
   // Load settings
   settings_loaded_callback = post_settings_loaded;
@@ -365,6 +385,10 @@ static void window_load(Window *window) {
     .did_focus = focus_handler
   });
   #endif
+  
+  unobstructed_area_service_subscribe((UnobstructedAreaHandlers) {
+    .will_change = area_change_handler
+  }, NULL);
 }
 
 static void window_unload(Window *window) {
@@ -373,6 +397,7 @@ static void window_unload(Window *window) {
   text_layer_destroy(s_date_layer);
   if (s_animation) animation_destroy(s_animation);
   app_focus_service_unsubscribe();
+  unobstructed_area_service_unsubscribe();
 }
 
 // --- Initialization --- //
@@ -399,6 +424,7 @@ static void init(void) {
 static void deinit(void) {
   tick_timer_service_unsubscribe();
   window_destroy(s_window);
+  app_message_deregister_callbacks();
 }
 
 int main(void) {
