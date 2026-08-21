@@ -16,6 +16,28 @@ static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_c
 void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   // Set the pixel region
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
+  
+  // Block out corner cells
+  for (int16_t y = 0; y < BITS; y++) {
+    for (int16_t x = 0; x < BITS; x++) {
+      GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
+      #ifdef PBL_ROUND
+        if (centered.x * centered.x + centered.y * centered.y > BITS * BITS)
+          cells_grids.base[y] |= 1 << x;
+      #else
+        const int16_t spread = BITS;
+        if ((centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 4 ||
+            (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 4 ||
+            centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 4 ||
+            centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 4)
+          cells_grids.base[y] |= 1 << x;
+      #endif
+    }
+  }
+  
+  // Block out center cells
+  cells_grids.base[BITS / 2 - 1] |= 0b11 << (BITS / 2 - 1);
+  cells_grids.base[BITS / 2]     |= 0b11 << (BITS / 2 - 1);
 }
 
 void cells_reset_grid(grid_t grid[]) {
@@ -83,8 +105,8 @@ GRect cells_world_to_local(GRect rect) {
 }
 
 GRect cells_local_to_world(GRect rect) {
-  return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x,
-               rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y,
+  return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x - 1,
+               rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y - 1,
                rect.size.w * screen_region.size.w / BITS + 2,
                rect.size.h * screen_region.size.h / BITS + 2);
 }
@@ -96,26 +118,25 @@ void cells_debug_draw(GContext *ctx) {
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
       grid_t x_bit = 1 << x;
-      graphics_context_set_stroke_color(ctx, 
+      graphics_context_set_stroke_color(ctx,
         cells_grids.screen[y] & x_bit ? GColorYellow
         : cells_grids.base[y] & x_bit ? GColorBlue 
         : cells_grids.fractal[y] & x_bit ? GColorPurple
         : cells_grids.sensitive[y] & x_bit ? GColorRed
         : GColorGreen); // Empty
+      bool is_cross = (cells_grids.screen[y] | cells_grids.fractal[y] | cells_grids.sensitive[y]) & x_bit;
       
-      #define POINTS
-      #ifdef CROSSES
+      if (is_cross) { // Cross
         GSize size = GSize(screen_region.size.w / BITS, screen_region.size.h / BITS);
         GPoint origin = GPoint(screen_region.origin.x + x * size.w, screen_region.origin.y + y * size.h);
         graphics_draw_line(ctx, origin, GPoint(origin.x + size.w, origin.y + size.h));
         graphics_draw_line(ctx, GPoint(origin.x + size.w, origin.y), GPoint(origin.x, origin.y + size.h));
-        #undef CROSSES
-      #elif defined(POINTS)
+      }
+      else { // Point
         graphics_draw_pixel(ctx, GPoint(
-          screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2 + 1,
-          screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2 + 1));
-        #undef POINTS
-      #endif
+          screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
+          screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2));
+      }
     }
   }
   // Draw the largest rectangle
