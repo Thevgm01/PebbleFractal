@@ -56,7 +56,72 @@ void cells_mark_point(grid_t grid[], GPoint world_pos) {
   }
 }
 
-void cells_mark_rect(grid_t grid[], GRect local_rect) {
+void mark_line_low(grid_t grid[], int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+  int16_t delta_x = x1 - x0;
+  int16_t delta_y = y1 - y0;
+  int16_t yi = 1;
+  if (delta_y < 0) {
+    yi = -1;
+    delta_y = -delta_y;
+  }
+  int16_t d = delta_y * 2 - delta_x;
+  int16_t y = y0;
+  
+  for(int16_t x = x0; x <= x1; x++) {
+    cells_mark_point(grid, GPoint(x, y));
+    
+    if (d > 0) {
+      y += yi;
+      d += 2 * (delta_y - delta_x);
+    }
+    else {
+      d += 2 * delta_y;
+    }
+  }
+}
+
+void mark_line_high(grid_t grid[], int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+  int16_t delta_x = x1 - x0;
+  int16_t delta_y = y1 - y0;
+  int16_t xi = 1;
+  if (delta_x < 0) {
+    xi = -1;
+    delta_x = -delta_x;
+  }
+  int16_t d = (2 * delta_x) - delta_y;
+  int16_t x = x0;
+  
+  for (int16_t y = y0; y <= y1; y++) {
+    cells_mark_point(grid, GPoint(x, y));
+    
+    if (d > 0) {
+      x += xi;
+      d += 2 * (delta_x - delta_y);
+    }
+    else {
+      d += 2 * delta_x;
+    }
+  }
+}
+
+void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destintation) {
+  if (abs(world_destintation.y - world_origin.y) < abs(world_destintation.x - world_origin.x)) {
+    if (world_origin.x > world_destintation.x)
+      mark_line_low(grid, world_destintation.x, world_destintation.y, world_origin.x, world_origin.y);
+    else
+      mark_line_low(grid, world_origin.x, world_origin.y, world_destintation.x, world_destintation.y);
+  }
+  else {
+    if (world_origin.y > world_destintation.y)
+      mark_line_high(grid, world_destintation.x, world_destintation.y, world_origin.x, world_origin.y);
+    else
+      mark_line_high(grid, world_origin.x, world_origin.y, world_destintation.x, world_destintation.y);
+  }
+}
+
+void cells_mark_rect(grid_t grid[], GRect world_rect) {
+  
+  GRect local_rect = cells_world_to_local(world_rect);
   
   // If we're over the left edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {

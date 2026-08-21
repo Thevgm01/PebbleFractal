@@ -70,8 +70,14 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    cells_mark_point(cells_grids.fractal, minute_point);
-    cells_mark_point(cells_grids.fractal, hour_point);
+    if (length > 10) {
+      cells_mark_line(cells_grids.fractal, origin, minute_point);
+      cells_mark_line(cells_grids.fractal, origin, hour_point);
+    }
+    else {
+      cells_mark_point(cells_grids.fractal, minute_point);
+      cells_mark_point(cells_grids.fractal, hour_point);
+    }
   }
   
   // Recurse before drawing so that earlier branches appear on top
@@ -220,7 +226,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
       cells_reset_grid(cells_grids.sensitive);
-      cells_mark_rect(cells_grids.sensitive, cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)));
+      cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
       //cells_debug_print(cells_sensitive_grid);
     }
     

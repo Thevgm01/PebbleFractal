@@ -18,7 +18,8 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset);
 
 void cells_reset_grid(grid_t grid[]);
 void cells_mark_point(grid_t grid[], GPoint world_pos);
-void cells_mark_rect(grid_t grid[], GRect local_rect);
+void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destination);
+void cells_mark_rect(grid_t grid[], GRect world_rect);
 bool cells_sensitive_overwritten();
 
 void cells_set_min_size(GSize size);
