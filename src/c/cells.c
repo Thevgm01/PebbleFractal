@@ -46,7 +46,7 @@ int16_t cells_occupied_grid[BITS];
 int16_t cells_sensitive_grid[BITS];
 
 GRect screen_region;
-TextCellSizing sizing;
+GSize min_size;
 
 static int16_t histogram_stack[BITS];
 static int16_t histogram_stack_count = 0;
@@ -54,7 +54,7 @@ static void histogram_stack_push(int16_t value) { histogram_stack[histogram_stac
 static int16_t histogram_stack_pop() { return histogram_stack[--histogram_stack_count]; }
 static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_count - 1]; }
 
-void cells_init(GPoint center, int16_t diameter, int16_t inset, TextCellSizing text_sizing) {
+void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   // Set the pixel region
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
   
@@ -62,9 +62,6 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset, TextCellSizing t
   cells_largest_rect = GRect(0, 0, BITS, BITS);
   cells_reset_grid(cells_occupied_grid);
   cells_reset_grid(cells_sensitive_grid);
-  
-  // Remember the text size settings
-  sizing = text_sizing;
 }
 
 void cells_reset_grid(int16_t grid[]) {
@@ -106,12 +103,6 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
   }
 }
 
-void cells_mark_text_rect(int16_t grid[], GRect text_rect) {  
-  //cells_mark_point(grid, text_rect.origin);
-  //cells_mark_point(grid, lr);
-  cells_mark_rect(grid, cells_world_to_local(text_rect));
-}
-
 bool cells_sensitive_overwritten() {
   for (int16_t y = 0; y < BITS; y++)
     if (cells_occupied_grid[y] & cells_sensitive_grid[y] & ~default_grid[y])
@@ -119,14 +110,8 @@ bool cells_sensitive_overwritten() {
   return false;
 }
 
-GRect cells_get_centered_rect(GRect reference_local_rect) {
-  GSize size = GSize(
-    reference_local_rect.size.w % 2 == 0 ? sizing.w_even : sizing.w_odd,
-    reference_local_rect.size.h % 2 == 0 ? sizing.h_even : sizing.h_odd);
-  GPoint origin = GPoint(
-    reference_local_rect.origin.x + (reference_local_rect.size.w - size.w) / 2,
-    reference_local_rect.origin.y + (reference_local_rect.size.h - size.h) / 2);
-  return (GRect) { .origin = origin, .size = size };
+void cells_set_min_size(GSize size) {
+  min_size = size;
 }
 
 GRect cells_world_to_local(GRect rect) {
@@ -158,6 +143,7 @@ void cells_debug_draw(GContext *ctx) {
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
+      // Crosses
       graphics_context_set_stroke_color(ctx, 
         (default_grid[y] & (1 << x)) != 0 ? GColorBlue 
         : (cells_occupied_grid[y] & (1 << x)) != 0 ? GColorPurple
@@ -175,7 +161,7 @@ void cells_debug_draw(GContext *ctx) {
                screen_region.origin.y + (y + 1) * screen_region.size.h / BITS),
         GPoint(screen_region.origin.x + (x + 1) * screen_region.size.w / BITS, 
                screen_region.origin.y + y * screen_region.size.h / BITS));
-      /*
+      /* Points
       GPoint point = GPoint(
         screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
         screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2);
@@ -217,11 +203,13 @@ void cells_debug_print(int16_t grid[]) {
 // --- Largest rect caclulation --- //
 
 static int16_t gsize_score(GSize size) {
-  // Strongly prefer rects that meet a minimum width and/or height
-  bool meets_w = (is_even(size.w) && size.w >= sizing.w_even) || (is_odd(size.w) && size.w >= sizing.w_odd);
-  bool meets_h = (is_even(size.h) && size.h >= sizing.h_even) || (is_odd(size.h) && size.h >= sizing.h_odd);
+  // Must have some area
+  if (size.w == 0 || size.h == 0) return 0;
+  // Rapidly gain score as we meet the minimum desired dimensions, but not if we exceed
+  int16_t w_score = min(size.w * 1000 / min_size.w, 1000);
+  int16_t h_score = min(size.h * 1000 / min_size.h, 1000);
   // Somewhat prefer wider rects, even if they technically have the same area as a tall rect
-  return size.w * (size.h + 6) + (meets_w ? 1000 : 0) + (meets_h ? 1000 : 0);
+  return size.w * (size.h + 5) + w_score + h_score;
 }
 
 // Find the largest rect within a 1D histogram

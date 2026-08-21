@@ -197,11 +197,13 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
       text_layer_set_text(s_date_layer, date_buf);
       s_date_rect.size = text_layer_get_content_size(s_date_layer);
+      cells_set_min_size(cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)).size);
     }
     
     // Move the date if the fractal passed over it, or on first load
     bool move_date = cells_sensitive_overwritten() || ctx == NULL;
     if (move_date) {
+      
       // Calculate the largest rect (expensive!)
       cells_update_largest_rect();
       
@@ -372,16 +374,10 @@ static void window_load(Window *window) {
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  TextCellSizing date_sizing = (TextCellSizing) {
-    .w_even = 6,
-    .w_odd = 7,
-    .h_even = 2,
-    .h_odd = 1
-  };
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Initialize the occupied screen cell tracker
-  cells_init(center, min_dim, 20, date_sizing);
+  cells_init(center, min_dim, 20);
 
   // Load settings
   settings_load();
