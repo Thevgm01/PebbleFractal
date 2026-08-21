@@ -112,8 +112,8 @@ void cells_debug_draw(GContext *ctx) {
         #undef CROSSES
       #elif defined(POINTS)
         graphics_draw_pixel(ctx, GPoint(
-          screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
-          screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2));
+          screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2 + 1,
+          screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2 + 1));
         #undef POINTS
       #endif
     }
