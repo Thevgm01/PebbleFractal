@@ -21,6 +21,7 @@ void cells_mark_text_rect(int16_t grid[], GRect text_rect);
 bool cells_sensitive_overwritten();
 
 GRect cells_get_centered_rect(GRect reference_local_rect);
+GRect cells_world_to_local(GRect rect);
 GRect cells_local_to_world(GRect rect);
 
 void cells_update_largest_rect(); // https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/

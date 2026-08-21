@@ -107,25 +107,9 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
 }
 
 void cells_mark_text_rect(int16_t grid[], GRect text_rect) {  
-  #define to_local(pos) GPoint( \
-    (pos.x - screen_region.origin.x) * BITS / screen_region.size.w, \
-    (pos.y - screen_region.origin.y) * BITS / screen_region.size.h)
-  
-  //text_rect = grect_crop(text_rect, 5);
-  GPoint lr = GPoint(text_rect.origin.x + text_rect.size.w, text_rect.origin.y + text_rect.size.h);
-  
-  GPoint local_ul = to_local(text_rect.origin);
-  GPoint local_lr = to_local(lr);
-  
-  GRect local_rect = GRect(
-    local_ul.x,
-    local_ul.y,
-    local_lr.x - local_ul.x,
-    local_lr.y - local_ul.y);
-  
   //cells_mark_point(grid, text_rect.origin);
   //cells_mark_point(grid, lr);
-  cells_mark_rect(grid, local_rect);
+  cells_mark_rect(grid, cells_world_to_local(text_rect));
 }
 
 bool cells_sensitive_overwritten() {
@@ -143,6 +127,22 @@ GRect cells_get_centered_rect(GRect reference_local_rect) {
     reference_local_rect.origin.x + (reference_local_rect.size.w - size.w) / 2,
     reference_local_rect.origin.y + (reference_local_rect.size.h - size.h) / 2);
   return (GRect) { .origin = origin, .size = size };
+}
+
+GRect cells_world_to_local(GRect rect) {
+  #define to_local(pos) GPoint( \
+    (pos.x - screen_region.origin.x) * BITS / screen_region.size.w, \
+    (pos.y - screen_region.origin.y) * BITS / screen_region.size.h)
+  
+  GPoint lower_right = GPoint(rect.origin.x + rect.size.w, rect.origin.y + rect.size.h);
+  GPoint local_upper_left = to_local(rect.origin);
+  GPoint local_lower_right = to_local(lower_right);
+  
+  return GRect(
+    local_upper_left.x,
+    local_upper_left.y,
+    local_lower_right.x - local_upper_left.x,
+    local_lower_right.y - local_upper_left.y);
 }
 
 GRect cells_local_to_world(GRect rect) {

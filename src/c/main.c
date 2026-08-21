@@ -197,7 +197,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
       text_layer_set_text(s_date_layer, date_buf);
       s_date_rect.size = text_layer_get_content_size(s_date_layer);
-      s_date_rect = grect_crop(s_date_rect, DATE_CROP);
     }
     
     // Move the date if the fractal passed over it, or on first load
@@ -206,21 +205,20 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       // Calculate the largest rect (expensive!)
       cells_update_largest_rect();
       
-      GRect largest_rect = cells_local_to_world(cells_largest_rect);
-      s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
+      s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world(cells_largest_rect));
       
       // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
       // Probably needs to be adjusted on a per-font-basis
       layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
-        s_date_rect.origin.x - DATE_CROP, 
-        s_date_rect.origin.y - DATE_CROP - 4, 
+        s_date_rect.origin.x, 
+        s_date_rect.origin.y - 4, 
         100, 
         30));
       
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
       cells_reset_grid(cells_sensitive_grid);
-      cells_mark_text_rect(cells_sensitive_grid, s_date_rect);
+      cells_mark_rect(cells_sensitive_grid, cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)));
       //cells_debug_print(cells_sensitive_grid);
     }
     
@@ -231,7 +229,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       cells_debug_draw(ctx);
 
       graphics_context_set_stroke_color(ctx, GColorCyan);
-      graphics_draw_rect(ctx, s_date_rect);
+      graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
     }
   }
 }
