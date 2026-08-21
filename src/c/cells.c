@@ -111,8 +111,7 @@ void cells_mark_text_rect(int16_t grid[], GRect text_rect) {
     (pos.x - screen_region.origin.x) * BITS / screen_region.size.w, \
     (pos.y - screen_region.origin.y) * BITS / screen_region.size.h)
   
-  int16_t half_cell_width = screen_region.size.w / BITS / 2;
-  text_rect = grect_crop(text_rect, 2);
+  //text_rect = grect_crop(text_rect, 5);
   GPoint lr = GPoint(text_rect.origin.x + text_rect.size.w, text_rect.origin.y + text_rect.size.h);
   
   GPoint local_ul = to_local(text_rect.origin);

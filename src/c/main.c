@@ -8,6 +8,7 @@
 //#define CIRCLES
 
 #define MAX_RECURSION_DEPTH 13
+#define DATE_CROP 6
 
 // --- Static Variables --- //
 
@@ -196,6 +197,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
       text_layer_set_text(s_date_layer, date_buf);
       s_date_rect.size = text_layer_get_content_size(s_date_layer);
+      s_date_rect = grect_crop(s_date_rect, DATE_CROP);
     }
     
     // Move the date if the fractal passed over it, or on first load
@@ -209,7 +211,11 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       
       // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
       // Probably needs to be adjusted on a per-font-basis
-      layer_set_frame(text_layer_get_layer(s_date_layer), GRect(s_date_rect.origin.x, s_date_rect.origin.y - 4, 100, 30));
+      layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
+        s_date_rect.origin.x - DATE_CROP, 
+        s_date_rect.origin.y - DATE_CROP - 4, 
+        100, 
+        30));
       
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
