@@ -8,7 +8,7 @@
 //#define CIRCLES
 
 #define MAX_RECURSION_DEPTH 13
-#define DATE_CROP 6
+#define DATE_CROP 5
 
 // --- Static Variables --- //
 
@@ -70,7 +70,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    if (length > 10) {
+    if (length > cells_pixels_per_cell * 3) {
       cells_mark_line(cells_grids.fractal, origin, minute_point);
       cells_mark_line(cells_grids.fractal, origin, hour_point);
     }
@@ -203,7 +203,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
       text_layer_set_text(s_date_layer, date_buf);
       s_date_rect.size = text_layer_get_content_size(s_date_layer);
-      cells_set_min_size(cells_world_to_local(grect_crop(s_date_rect, DATE_CROP)).size);
+      cells_set_min_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
     }
     
     // Move the date if the fractal passed over it, or on first load
@@ -213,7 +213,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       // Calculate the largest rect (expensive!)
       cells_update_largest_rect();
       
-      s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world(cells_largest_rect));
+      s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
       
       // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
       // Probably needs to be adjusted on a per-font-basis

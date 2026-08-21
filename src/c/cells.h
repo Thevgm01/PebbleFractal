@@ -11,6 +11,7 @@ typedef struct {
   grid_t sensitive[BITS];
 } CellsGrids;
 
+extern int16_t cells_pixels_per_cell;
 extern GRect cells_largest_rect;
 extern CellsGrids cells_grids;
 
@@ -23,8 +24,9 @@ void cells_mark_rect(grid_t grid[], GRect world_rect);
 bool cells_sensitive_overwritten();
 
 void cells_set_min_size(GSize size);
-GRect cells_world_to_local(GRect rect);
-GRect cells_local_to_world(GRect rect);
+GPoint cells_world_to_local_point(GPoint point);
+GRect cells_world_to_local_rect(GRect rect);
+GRect cells_local_to_world_rect(GRect rect);
 
 void cells_update_largest_rect(); // https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/
 

@@ -2,8 +2,10 @@
 #include "cells.h"
 #include "utility.h"
 
-GRect cells_largest_rect;
 CellsGrids cells_grids;
+GRect cells_largest_rect;
+int16_t cells_pixels_per_cell;
+
 GRect screen_region;
 GSize min_size;
 
@@ -16,6 +18,8 @@ static int16_t histogram_stack_peek() { return histogram_stack[histogram_stack_c
 void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   // Set the pixel region
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
+  cells_pixels_per_cell = (diameter - inset * 2) / BITS;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Pixels per cell: %d", cells_pixels_per_cell);
   
   // Block out corner cells
   for (int16_t y = 0; y < BITS; y++) {
@@ -25,6 +29,7 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
         if (centered.x * centered.x + centered.y * centered.y > BITS * BITS)
           cells_grids.base[y] |= 1 << x;
       #else
+        // Use four offset circles to approximate a squircle
         const int16_t spread = BITS;
         if ((centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 4 ||
             (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 4 ||
@@ -68,7 +73,9 @@ void mark_line_low(grid_t grid[], int16_t x0, int16_t y0, int16_t x1, int16_t y1
   int16_t y = y0;
   
   for(int16_t x = x0; x <= x1; x++) {
-    cells_mark_point(grid, GPoint(x, y));
+    // Can this maybe be optimized?
+    if (x >= 0 && x < BITS && y >= 0 && y < BITS)
+      grid[y] |= 1 << x;
     
     if (d > 0) {
       y += yi;
@@ -92,7 +99,8 @@ void mark_line_high(grid_t grid[], int16_t x0, int16_t y0, int16_t x1, int16_t y
   int16_t x = x0;
   
   for (int16_t y = y0; y <= y1; y++) {
-    cells_mark_point(grid, GPoint(x, y));
+    if (x >= 0 && x < BITS && y >= 0 && y < BITS)
+      grid[y] |= 1 << x;
     
     if (d > 0) {
       x += xi;
@@ -105,23 +113,27 @@ void mark_line_high(grid_t grid[], int16_t x0, int16_t y0, int16_t x1, int16_t y
 }
 
 void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destintation) {
-  if (abs(world_destintation.y - world_origin.y) < abs(world_destintation.x - world_origin.x)) {
-    if (world_origin.x > world_destintation.x)
-      mark_line_low(grid, world_destintation.x, world_destintation.y, world_origin.x, world_origin.y);
+  
+  GPoint origin = cells_world_to_local_point(world_origin);
+  GPoint destination = cells_world_to_local_point(world_destintation);
+  
+  if (abs(destination.y - origin.y) < abs(destination.x - origin.x)) {
+    if (origin.x > destination.x)
+      mark_line_low(grid, destination.x, destination.y, origin.x, origin.y);
     else
-      mark_line_low(grid, world_origin.x, world_origin.y, world_destintation.x, world_destintation.y);
+      mark_line_low(grid, origin.x, origin.y, destination.x, destination.y);
   }
   else {
-    if (world_origin.y > world_destintation.y)
-      mark_line_high(grid, world_destintation.x, world_destintation.y, world_origin.x, world_origin.y);
+    if (origin.y > destination.y)
+      mark_line_high(grid, destination.x, destination.y, origin.x, origin.y);
     else
-      mark_line_high(grid, world_origin.x, world_origin.y, world_destintation.x, world_destintation.y);
+      mark_line_high(grid, origin.x, origin.y, destination.x, destination.y);
   }
 }
 
 void cells_mark_rect(grid_t grid[], GRect world_rect) {
   
-  GRect local_rect = cells_world_to_local(world_rect);
+  GRect local_rect = cells_world_to_local_rect(world_rect);
   
   // If we're over the left edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {
@@ -130,9 +142,9 @@ void cells_mark_rect(grid_t grid[], GRect world_rect) {
   }
   
   // If we're over the right edge, shrink size
-  local_rect.size.w = min(BITS - 1, local_rect.size.w) + 1;
+  local_rect.size.w = min(BITS, local_rect.size.w + 1);
   
-  // This might fail if the size is exactly 16? Not 100% sure
+  // This might fail if the size is wider than BITS? Not 100% sure
   grid_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
   
   // Fill out the rows
@@ -153,14 +165,16 @@ void cells_set_min_size(GSize size) {
   min_size = size;
 }
 
-GRect cells_world_to_local(GRect rect) {
-  #define to_local(pos) GPoint( \
-    (pos.x - screen_region.origin.x) * BITS / screen_region.size.w, \
-    (pos.y - screen_region.origin.y) * BITS / screen_region.size.h)
-  
+GPoint cells_world_to_local_point(GPoint point) {
+  return GPoint(
+    (point.x - screen_region.origin.x) * BITS / screen_region.size.w,
+    (point.y - screen_region.origin.y) * BITS / screen_region.size.h);
+}
+
+GRect cells_world_to_local_rect(GRect rect) {  
   GPoint lower_right = GPoint(rect.origin.x + rect.size.w, rect.origin.y + rect.size.h);
-  GPoint local_upper_left = to_local(rect.origin);
-  GPoint local_lower_right = to_local(lower_right);
+  GPoint local_upper_left = cells_world_to_local_point(rect.origin);
+  GPoint local_lower_right = cells_world_to_local_point(lower_right);
   
   return GRect(
     local_upper_left.x,
@@ -169,7 +183,7 @@ GRect cells_world_to_local(GRect rect) {
     local_lower_right.y - local_upper_left.y);
 }
 
-GRect cells_local_to_world(GRect rect) {
+GRect cells_local_to_world_rect(GRect rect) {
   return GRect(rect.origin.x * screen_region.size.w / BITS + screen_region.origin.x - 1,
                rect.origin.y * screen_region.size.h / BITS + screen_region.origin.y - 1,
                rect.size.w * screen_region.size.w / BITS + 2,
@@ -206,7 +220,7 @@ void cells_debug_draw(GContext *ctx) {
   }
   // Draw the largest rectangle
   graphics_context_set_stroke_color(ctx, GColorOrange);
-  graphics_draw_rect(ctx, cells_local_to_world(cells_largest_rect));
+  graphics_draw_rect(ctx, cells_local_to_world_rect(cells_largest_rect));
 }
 
 void cells_debug_print(grid_t grid[]) {
