@@ -316,31 +316,6 @@ static void post_settings_loaded() {
   s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
 }
 
-static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
-  
-  #define LOAD_COLOR(var, key) (var) = (GColorFromHEX(dict_find(iterator, key)->value->int32))
-  #define LOAD_INT(var, key) (var) = (dict_find(iterator, key)->value->int32)
-  #define LOAD_BOOL(var, key) (var) = (dict_find(iterator, key)->value->int32 == 1)
-  
-  LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
-  LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
-  LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
-  LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
-  LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
-  LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
-  LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
-  LOAD_INT(settings.WidthScale, MESSAGE_KEY_WidthScale);
-  LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
-  LOAD_INT(settings.FontSize, MESSAGE_KEY_FontSize);
-  LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
-  LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
-  
-  settings_save();
-  
-  post_settings_loaded();
-}
-
 // --- Window --- //
 
 static void focus_handler(bool focus) {
@@ -380,11 +355,11 @@ static void window_load(Window *window) {
   cells_init(center, min_dim, 20);
 
   // Load settings
+  settings_loaded_callback = post_settings_loaded;
   settings_load();
-  post_settings_loaded();
-  
-  #ifndef SCREENSHOTMODE
+    
   // Animation stuff
+  #ifndef SCREENSHOTMODE
   s_max_depth = 0;
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
     .did_focus = focus_handler

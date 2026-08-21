@@ -18,6 +18,7 @@ typedef struct {
 } ClaySettings;
 
 static ClaySettings settings;
+static void (*settings_loaded_callback)();
 
 static void settings_restore_default() {
   settings.PrimaryColor = GColorWhite;
@@ -39,4 +40,32 @@ static void settings_save() {
 static void settings_load() {
   settings_restore_default();
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+  settings_loaded_callback();
+}
+
+static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
+  
+  #define LOAD_COLOR(var, key) (var) = (GColorFromHEX(dict_find(iterator, key)->value->int32))
+  #define LOAD_INT(var, key) (var) = (dict_find(iterator, key)->value->int32)
+  #define LOAD_BOOL(var, key) (var) = (dict_find(iterator, key)->value->int32 == 1)
+  LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
+  LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
+  LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
+  LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
+  LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
+  LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
+  LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
+  LOAD_INT(settings.WidthScale, MESSAGE_KEY_WidthScale);
+  LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
+  LOAD_INT(settings.FontSize, MESSAGE_KEY_FontSize);
+  LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
+  LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
+  #undef LOAD_COLOR
+  #undef LOAD_INT
+  #undef LOAD_BOOL
+  
+  settings_save();
+  
+  settings_loaded_callback();
 }
