@@ -18,13 +18,13 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   screen_region = grect_crop(GRect(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter), inset);
 }
 
-void cells_reset_grid(int16_t grid[]) {
+void cells_reset_grid(grid_t grid[]) {
   for (int16_t y = 0; y < BITS; y++) {
     grid[y] = 0;
   }
 }
 
-void cells_mark_point(int16_t grid[], GPoint world_pos) {
+void cells_mark_point(grid_t grid[], GPoint world_pos) {
   int16_t y = (world_pos.y - screen_region.origin.y) * BITS / screen_region.size.h;
   if (y >= 0 && y < BITS) {
     int16_t x = (world_pos.x - screen_region.origin.x) * BITS / screen_region.size.w;
@@ -34,8 +34,7 @@ void cells_mark_point(int16_t grid[], GPoint world_pos) {
   }
 }
 
-void cells_mark_rect(int16_t grid[], GRect local_rect) {
-  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Marking rect: ", local_rect);
+void cells_mark_rect(grid_t grid[], GRect local_rect) {
   
   // If we're over the left edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {
@@ -47,8 +46,7 @@ void cells_mark_rect(int16_t grid[], GRect local_rect) {
   local_rect.size.w = min(BITS - 1, local_rect.size.w) + 1;
   
   // This might fail if the size is exactly 16? Not 100% sure
-  int16_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
-  APP_LOG_BINARY(APP_LOG_LEVEL_DEBUG, "Row bits: ", row);
+  grid_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
   
   // Fill out the rows
   int16_t start_y = max(local_rect.origin.y, 0);
@@ -97,8 +95,7 @@ void cells_debug_draw(GContext *ctx) {
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
-      // Crosses
-      int16_t x_bit = 1 << x;
+      grid_t x_bit = 1 << x;
       graphics_context_set_stroke_color(ctx, 
         cells_grids.screen[y] & x_bit ? GColorYellow
         : cells_grids.base[y] & x_bit ? GColorBlue 
@@ -106,32 +103,19 @@ void cells_debug_draw(GContext *ctx) {
         : cells_grids.sensitive[y] & x_bit ? GColorRed
         : GColorGreen); // Empty
       
-      graphics_draw_line(ctx,
-        GPoint(screen_region.origin.x + x * screen_region.size.w / BITS, 
-               screen_region.origin.y + y * screen_region.size.h / BITS),
-        GPoint(screen_region.origin.x + (x + 1) * screen_region.size.w / BITS, 
-               screen_region.origin.y + (y + 1) * screen_region.size.h / BITS));
-      
-      graphics_draw_line(ctx,
-        GPoint(screen_region.origin.x + x * screen_region.size.w / BITS, 
-               screen_region.origin.y + (y + 1) * screen_region.size.h / BITS),
-        GPoint(screen_region.origin.x + (x + 1) * screen_region.size.w / BITS, 
-               screen_region.origin.y + y * screen_region.size.h / BITS));
-      /* Points
-      GPoint point = GPoint(
-        screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
-        screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2);
-      
-      bool cell_sensitive = (cells_sensitive_grid[y] & ~default_grid[y] & (1 << x)) != 0;
-      if (cell_sensitive) {
-        graphics_context_set_stroke_color(ctx, GColorYellow);
-        graphics_draw_circle(ctx, point, 2);
-      } else {
-        bool cell_filled = (cells_occupied_grid[y] & (1 << x)) != 0;
-        graphics_context_set_stroke_color(ctx, cell_filled ? GColorRed : GColorGreen);
-        graphics_draw_pixel(ctx, point);
-      }
-      */
+      #define POINTS
+      #ifdef CROSSES
+        GSize size = GSize(screen_region.size.w / BITS, screen_region.size.h / BITS);
+        GPoint origin = GPoint(screen_region.origin.x + x * size.w, screen_region.origin.y + y * size.h);
+        graphics_draw_line(ctx, origin, GPoint(origin.x + size.w, origin.y + size.h));
+        graphics_draw_line(ctx, GPoint(origin.x + size.w, origin.y), GPoint(origin.x, origin.y + size.h));
+        #undef CROSSES
+      #elif defined(POINTS)
+        graphics_draw_pixel(ctx, GPoint(
+          screen_region.origin.x + (2 * x + 1) * screen_region.size.w / BITS / 2,
+          screen_region.origin.y + (2 * y + 1) * screen_region.size.h / BITS / 2));
+        #undef POINTS
+      #endif
     }
   }
   // Draw the largest rectangle
@@ -139,7 +123,7 @@ void cells_debug_draw(GContext *ctx) {
   graphics_draw_rect(ctx, cells_local_to_world(cells_largest_rect));
 }
 
-void cells_debug_print(int16_t grid[]) {
+void cells_debug_print(grid_t grid[]) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Address of grid: 0x%x", grid);
   for (int16_t y = 0; y < BITS; y += 2) {
     static char output_row[BITS * 3];
@@ -215,9 +199,9 @@ void cells_update_largest_rect() {
     histogram[i] = 0; // Reset histogram values since static arrays don't do that apparently
 
   for (int16_t y = BITS - 1; y >= 0; y--) {
-    int16_t combined_row = cells_grids.base[y] | cells_grids.fractal[y] | cells_grids.screen[y];
+    grid_t combined_row = cells_grids.base[y] | cells_grids.fractal[y] | cells_grids.screen[y];
     for (int16_t x = 0; x < BITS; x++)
-      histogram[x] = combined_row & (1 << x) ? 0 : histogram[x] + 1; // Add or reset
+      histogram[x] = combined_row & (1 << x) ? 0 : histogram[x] + 1; // Add if open, reset if occupied
 
     // Scan through each histogram looking for the largest rect
     GRect possible_largest = compute_histogram_rect(histogram, y);

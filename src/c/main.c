@@ -357,6 +357,7 @@ static void window_load(Window *window) {
   
   // Initialize the occupied screen cell tracker
   cells_init(center, min_dim, 20);
+  #if BITS == 16
   cells_grids.base[0]  = PBL_IF_ROUND_ELSE(0b1111100000011111, 0b1111000000001111);
   cells_grids.base[1]  = PBL_IF_ROUND_ELSE(0b1110000000000111, 0b1000000000000001);
   cells_grids.base[2]  = PBL_IF_ROUND_ELSE(0b1100000000000011, 0b1000000000000001);
@@ -373,6 +374,7 @@ static void window_load(Window *window) {
   cells_grids.base[13] = PBL_IF_ROUND_ELSE(0b1100000000000011, 0b1000000000000001);
   cells_grids.base[14] = PBL_IF_ROUND_ELSE(0b1110000000000111, 0b1000000000000001);
   cells_grids.base[15] = PBL_IF_ROUND_ELSE(0b1111100000011111, 0b1111000000001111);
+  #endif
 
   // Load settings
   settings_loaded_callback = post_settings_loaded;
