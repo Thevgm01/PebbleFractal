@@ -184,6 +184,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Check if we need to move the date twice per minute, or on first load
   s_mark_points = (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)) || ctx == NULL;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, s_mark_points ? "Yes" : "No");
   if (s_mark_points) cells_reset_grid(cells_grids.fractal);
   
   // Draw fractal
@@ -335,7 +336,7 @@ static void focus_handler(bool focus) {
   }
 }
 
-static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx) {
+static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx) {  
   int16_t delta_height = s_window_bounds.size.h - final_unobstructed_screen_area.size.h;
   GRect obstructed_area = GRect(0, s_window_bounds.size.h - delta_height, s_window_bounds.size.w, delta_height);
   
@@ -343,7 +344,8 @@ static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx)
   
   if (delta_height > 0) {
     cells_mark_rect(cells_grids.screen, obstructed_area);
-    layer_mark_dirty(s_fractal_layer);
+    if (settings.ShowDate)
+      layer_mark_dirty(s_fractal_layer);
   }
 }
 

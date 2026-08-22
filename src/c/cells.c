@@ -26,16 +26,16 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
     grid_t row = 0;
     for (int16_t x = 0; x < BITS / 2; x++) {
       const GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
-      const int16_t spread = BITS;
+      const int16_t spread = BITS * 2;
       row |= PBL_IF_ROUND_ELSE(
         // Simple radius check if round
         centered.x * centered.x + centered.y * centered.y > BITS * BITS, 
         
         // Check 4 offset circles to approximate a squircle if rectangular
-        (centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 4 ||
-        (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 4 ||
-        centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 4 ||
-        centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 4)
+        (centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 9 ||
+        (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 9 ||
+        centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 9 ||
+        centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 9)
         
         // Mirror horizontally
         ? (1 << x) | ((1 << (BITS - 1)) >> x) : 0;

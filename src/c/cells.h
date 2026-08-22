@@ -1,8 +1,15 @@
 #pragma once
 #include <pebble.h>
 
-#define BITS 32
-typedef int32_t grid_t;
+#if defined(PBL_PLATFORM_BASALT) || defined(PBL_PLATFORM_CHALK)
+  // Use a coarser grid for the older/smaller devices
+  #define BITS 16
+  typedef int16_t grid_t;
+#else
+  // Otherwise use a nice and roomy grid
+  #define BITS 32
+  typedef int32_t grid_t;
+#endif
 
 typedef struct {
   grid_t base[BITS];
