@@ -80,6 +80,7 @@ module.exports = [
         "messageKey": "HourHandLength",
         "label": "Hour Hand Length",
         "defaultValue": 40,
+        "description": "Must not be longer than the minute hand",
         "min": 0,
         "max": 100,
         "step": 5
@@ -89,9 +90,9 @@ module.exports = [
         "messageKey": "RecurseScale",
         "label": "Recurse Scale",
         "defaultValue": 0.8,
-        "min": 0,
+        "min": 0.5,
         "max": 1,
-        "step": 0.05
+        "step": 0.01
       },
       {
         "type": "slider",

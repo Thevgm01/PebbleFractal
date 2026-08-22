@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "utility.h"
 
 #define SETTINGS_KEY 1
 
@@ -66,6 +67,7 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   #undef LOAD_INT
   #undef LOAD_BOOL
   settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
+  settings.HourHandLength = min(settings.MinuteHandLength, settings.HourHandLength);
 
   settings_save();
   settings_loaded_callback();
