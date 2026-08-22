@@ -53,11 +53,11 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
 }
 
 static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
-  #define SCALE_WITH_ANIMATION(var) (var) = \
-    (var * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX)
+  #define SCALE_WITH_ANIMATION(var) var * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX
+  #define TRUE_HAND_LENGTH settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength
   
   // Animate the length per depth
-  if (depth == s_max_depth) SCALE_WITH_ANIMATION(length);
+  if (depth == s_max_depth) length = SCALE_WITH_ANIMATION(length);
   
   // Early return if our length is zero (nothing to draw)
   if (length == 0)
@@ -72,11 +72,17 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    if (length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
-    else cells_mark_point(cells_grids.fractal, minute_point);
-    
-    if (hour_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, hour_point);
-    else cells_mark_point(cells_grids.fractal, hour_point);
+    if (depth == 0) {
+      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_minute_angle, length + TRUE_HAND_LENGTH));
+      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_hour_angle, (length + TRUE_HAND_LENGTH) * s_hour_hand_scale / 100));
+    }
+    else {
+      if (length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
+      else cells_mark_point(cells_grids.fractal, minute_point);
+      
+      if (hour_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, hour_point);
+      else cells_mark_point(cells_grids.fractal, hour_point);
+    }
   }
   
   // Recurse before drawing so that earlier branches appear on top
@@ -142,8 +148,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
 
     // Draw additional long lines for the true hands
     if (settings.FirstHandScale > 0 && s_max_depth >= 1) {
-      int16_t true_hand_length = settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength;
-      if (s_max_depth == 1) SCALE_WITH_ANIMATION(true_hand_length);
+      int16_t true_hand_length = TRUE_HAND_LENGTH;
+      if (s_max_depth == 1) true_hand_length = SCALE_WITH_ANIMATION(true_hand_length);
       graphics_draw_line(s_fractal_ctx, minute_point,
                          point_on_circle(origin, s_minute_angle, length + true_hand_length));
       graphics_draw_line(s_fractal_ctx, hour_point,
