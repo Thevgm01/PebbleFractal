@@ -31,6 +31,8 @@ static void settings_restore_default() {
   settings.WidthScale = 0;
   settings.FirstHandScale = 1;
   settings.FontSize = 18;
+  settings.DebugGrid = false;
+  settings.DebugSpeed = false;
 }
 
 static void settings_save() {
