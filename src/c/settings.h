@@ -12,7 +12,7 @@ typedef struct {
   int16_t RecurseScale;
   int16_t WidthScale;
   int16_t FirstHandScale;
-  int16_t FontSize;
+  int16_t Font;
   bool DebugGrid;
   bool DebugSpeed;
 } ClaySettings;
@@ -30,7 +30,7 @@ static void settings_restore_default() {
   settings.RecurseScale = 80;
   settings.WidthScale = 0;
   settings.FirstHandScale = 1;
-  settings.FontSize = 18;
+  settings.Font = 18;
   settings.DebugGrid = false;
   settings.DebugSpeed = false;
 }
@@ -60,14 +60,13 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
   LOAD_INT(settings.WidthScale, MESSAGE_KEY_WidthScale);
   LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
-  LOAD_INT(settings.FontSize, MESSAGE_KEY_FontSize);
   LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
   LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
   #undef LOAD_COLOR
   #undef LOAD_INT
   #undef LOAD_BOOL
-  
+  settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
+
   settings_save();
-  
   settings_loaded_callback();
 }

@@ -8,7 +8,7 @@
 //#define CIRCLES
 
 #define MAX_RECURSION_DEPTH 13
-#define DATE_CROP 5
+#define DATE_CROP 4
 
 // --- Static Variables --- //
 
@@ -227,7 +227,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
         s_date_rect.origin.x, 
         s_date_rect.origin.y - 4, 
-        100, 
+        200, 
         30));
       
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
@@ -326,6 +326,24 @@ static void post_settings_loaded() {
   
   if (settings.ShowDate) {
     animation_stopped_proc(s_animation, false, NULL);
+    
+    GFont font;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", settings.Font);
+    switch (settings.Font) {
+      case 0: font = fonts_get_system_font(FONT_KEY_GOTHIC_14); break;
+      case 1: font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD); break;
+      default:
+      case 2: font = fonts_get_system_font(FONT_KEY_GOTHIC_18); break;
+      case 3: font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD); break;
+      case 4: font = fonts_get_system_font(FONT_KEY_GOTHIC_24); break;
+      case 5: font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD); break;
+      case 6: font = fonts_get_system_font(FONT_KEY_GOTHIC_28); break;
+      case 7: font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD); break;
+      case 13: font = fonts_get_system_font(FONT_KEY_ROBOTO_CONDENSED_21); break;
+      case 16: font = fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS); break;
+    }
+    text_layer_set_font(s_date_layer, font);
+    
     fractal_update_proc(s_fractal_layer, NULL);
   }
 }
@@ -375,10 +393,9 @@ static void window_load(Window *window) {
   layer_add_child(root, s_notch_layer);
   
   // Text layer
-  GRect date_rect = GRect(0, 0, 100, 30);
+  GRect date_rect = GRect(0, 0, 200, 30);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Initialize the occupied screen cell tracker

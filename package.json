@@ -23,7 +23,7 @@
             "RecurseScale",
             "WidthScale",
             "FirstHandScale",
-            "FontSize",
+            "Font",
             "DebugGrid",
             "DebugSpeed"
         ],
