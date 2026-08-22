@@ -206,10 +206,11 @@ void cells_debug_draw(GContext *ctx) {
       bool is_cross = (cells_grids.screen[y] | cells_grids.fractal[y] | cells_grids.sensitive[y]) & x_bit;
       
       if (is_cross) { // Cross
-        GSize size = GSize(screen_region.size.w / BITS, screen_region.size.h / BITS);
-        GPoint origin = GPoint(screen_region.origin.x + x * size.w, screen_region.origin.y + y * size.h);
-        graphics_draw_line(ctx, origin, GPoint(origin.x + size.w, origin.y + size.h));
-        graphics_draw_line(ctx, GPoint(origin.x + size.w, origin.y), GPoint(origin.x, origin.y + size.h));
+        #define SIZE_SCALE screen_region.size.w / BITS
+        GPoint origin = GPoint(screen_region.origin.x + x * SIZE_SCALE, screen_region.origin.y + y * SIZE_SCALE);
+        graphics_draw_line(ctx, origin, GPoint(origin.x + SIZE_SCALE, origin.y + SIZE_SCALE));
+        graphics_draw_line(ctx, GPoint(origin.x + SIZE_SCALE, origin.y), GPoint(origin.x, origin.y + SIZE_SCALE));
+        #undef SIZE_SCALE
       }
       else { // Point
         graphics_draw_pixel(ctx, GPoint(
