@@ -25,7 +25,8 @@
             "FirstHandScale",
             "Font",
             "DebugGrid",
-            "DebugSpeed"
+            "DebugSpeed",
+            "TertiaryColor"
         ],
         "projectType": "native",
         "resources": {

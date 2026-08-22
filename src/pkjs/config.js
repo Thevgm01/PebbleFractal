@@ -23,8 +23,14 @@ module.exports = [
       {
         "type": "color",
         "messageKey": "SecondaryColor",
-        "defaultValue": "0x444444",
+        "defaultValue": "0xbbbbbb",
         "label": "Secondary Color"
+      },
+      {
+        "type": "color",
+        "messageKey": "TertiaryColor",
+        "defaultValue": "0x444444",
+        "label": "Tertiary Color"
       },
       {
         "type": "color",

@@ -6,6 +6,7 @@
 typedef struct {
   GColor PrimaryColor;
   GColor SecondaryColor;
+  GColor TertiaryColor;
   GColor BackgroundColor;
   bool ShowDate;
   int16_t MinuteHandLength;
@@ -23,7 +24,8 @@ static void (*settings_loaded_callback)();
 
 static void settings_restore_default() {
   settings.PrimaryColor = GColorWhite;
-  settings.SecondaryColor = GColorDarkGray;
+  settings.SecondaryColor = GColorLightGray;
+  settings.TertiaryColor = GColorDarkGray;
   settings.BackgroundColor = GColorBlack;
   settings.ShowDate = true;
   settings.MinuteHandLength = 60;
@@ -54,6 +56,7 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   #define LOAD_BOOL(var, key) (var) = (dict_find(iterator, key)->value->int32 == 1)
   LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
   LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
+  LOAD_COLOR(settings.TertiaryColor, MESSAGE_KEY_TertiaryColor);
   LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
   LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
   LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);

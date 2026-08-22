@@ -21,7 +21,7 @@ static TextLayer *s_date_layer;
 
 // Animation
 static Animation *s_animation;
-static int8_t s_max_depth;
+static int8_t s_max_animation_depth;
 static int16_t s_length_mult_for_max_depth;
 
 // Fractal drawing
@@ -57,7 +57,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   #define TRUE_HAND_LENGTH settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength
   
   // Animate the length per depth
-  if (depth == s_max_depth) length = SCALE_WITH_ANIMATION(length);
+  if (depth == s_max_animation_depth) length = SCALE_WITH_ANIMATION(length);
   
   // Early return if our length is zero (nothing to draw)
   if (length == 0)
@@ -86,7 +86,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   }
   
   // Recurse before drawing so that earlier branches appear on top
-  if (depth < s_max_depth) {
+  if (depth < s_max_animation_depth) {
     draw_hands_recursive(minute_point, new_minute_angle, length * settings.RecurseScale / 100, depth + 1);
     draw_hands_recursive(hour_point, new_hour_angle, length * s_hour_hand_scale * settings.RecurseScale / 10000, depth + 1);
   }
@@ -98,10 +98,14 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   // Determine line width (can be zero, which will draw a 1-pixel line)
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * settings.WidthScale / 100;
   
-  // Make the hands white for the uppermost layer
+  // Set the colors based on the line length
   if (depth == 0)
+    // Make the hands white for the uppermost layer
     graphics_context_set_stroke_color(s_fractal_ctx, settings.PrimaryColor);
-  // Don't need to set back to gray because the uppermost layers are drawn last
+  else if (length > settings.MinuteHandLength / 6)
+    graphics_context_set_stroke_color(s_fractal_ctx, settings.SecondaryColor);
+  else
+    graphics_context_set_stroke_color(s_fractal_ctx, settings.TertiaryColor);
   
   #ifdef CIRCLES // Draw circles
     if (half_width > 1) {
@@ -147,9 +151,9 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     }
 
     // Draw additional long lines for the true hands
-    if (settings.FirstHandScale > 0 && s_max_depth >= 1) {
+    if (settings.FirstHandScale > 0 && s_max_animation_depth >= 1) {
       int16_t true_hand_length = TRUE_HAND_LENGTH;
-      if (s_max_depth == 1) true_hand_length = SCALE_WITH_ANIMATION(true_hand_length);
+      if (s_max_animation_depth == 1) true_hand_length = SCALE_WITH_ANIMATION(true_hand_length);
       graphics_draw_line(s_fractal_ctx, minute_point,
                          point_on_circle(origin, s_minute_angle, length + true_hand_length));
       graphics_draw_line(s_fractal_ctx, hour_point,
@@ -163,7 +167,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
 
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Early return if we're unable to render anything
-  if (s_max_depth == 0 && s_length_mult_for_max_depth == 0)
+  if (s_max_animation_depth == 0 && s_length_mult_for_max_depth == 0)
     return;
   
   GRect bounds = layer_get_bounds(layer);
@@ -201,7 +205,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   if (ctx != NULL) {
     graphics_context_set_antialiased(ctx, false);
     graphics_context_set_stroke_width(ctx, 1);
-    graphics_context_set_stroke_color(ctx, settings.SecondaryColor);
   }
   draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
   
@@ -296,14 +299,14 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 // --- Animation --- //
 
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
-  s_max_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
-  s_length_mult_for_max_depth = progress - (s_max_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d)", s_max_depth, s_length_mult_for_max_depth);
+  s_max_animation_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
+  s_length_mult_for_max_depth = progress - (s_max_animation_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d)", s_max_animation_depth, s_length_mult_for_max_depth);
   layer_mark_dirty(s_fractal_layer);
 }
 
 static void animation_stopped_proc(Animation *animation, bool finished, void *context) {
-  s_max_depth = MAX_RECURSION_DEPTH;
+  s_max_animation_depth = MAX_RECURSION_DEPTH;
   s_length_mult_for_max_depth = 0;
   s_animation = NULL;
 }
@@ -360,7 +363,7 @@ static void focus_handler(bool focus) {
   if (focus) {
     start_animation();
   } else {
-    s_max_depth = 0;
+    s_max_animation_depth = 0;
     s_length_mult_for_max_depth = 0;
     layer_mark_dirty(s_fractal_layer);
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: focus_handler");
@@ -413,7 +416,7 @@ static void window_load(Window *window) {
     
   // Animation stuff
   #ifndef SCREENSHOTMODE
-  s_max_depth = 0;
+  s_max_animation_depth = 0;
   app_focus_service_subscribe_handlers((AppFocusHandlers) {
     .did_focus = focus_handler
   });
