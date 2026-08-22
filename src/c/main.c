@@ -14,6 +14,7 @@
 
 // Windows
 static Window *s_window;
+static GRect s_window_bounds;
 static Layer *s_fractal_layer;
 static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
@@ -335,22 +336,30 @@ static void focus_handler(bool focus) {
 }
 
 static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx) {
-  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "unobstructed area: ", final_unobstructed_screen_area);
+  int16_t delta_height = s_window_bounds.size.h - final_unobstructed_screen_area.size.h;
+  GRect obstructed_area = GRect(0, s_window_bounds.size.h - delta_height, s_window_bounds.size.w, delta_height);
+  
+  cells_reset_grid(cells_grids.screen);
+  
+  if (delta_height > 0) {
+    cells_mark_rect(cells_grids.screen, obstructed_area);
+    layer_mark_dirty(s_fractal_layer);
+  }
 }
 
 static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(root);
-  GPoint center = grect_center_point(&bounds);
-  int16_t min_dim = min(bounds.size.w, bounds.size.h);
+  s_window_bounds = layer_get_bounds(root);
+  GPoint center = grect_center_point(&s_window_bounds);
+  int16_t min_dim = min(s_window_bounds.size.w, s_window_bounds.size.h);
 
   // Fractal layer
-  s_fractal_layer = layer_create(bounds);
+  s_fractal_layer = layer_create(s_window_bounds);
   layer_set_update_proc(s_fractal_layer, fractal_update_proc);
   layer_add_child(root, s_fractal_layer);
   
   // Notch layer
-  s_notch_layer = layer_create(bounds);
+  s_notch_layer = layer_create(s_window_bounds);
   layer_set_update_proc(s_notch_layer, notch_update_proc);
   layer_add_child(root, s_notch_layer);
   

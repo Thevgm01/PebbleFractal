@@ -7,10 +7,6 @@
 #define is_even(temp_a) (temp_a % 2 == 0)
 #define is_odd(temp_a) (temp_a % 2 == 1)
 
-#define get_center_point(temp_rect) GPoint ( \
-  temp_rect.origin.x + temp_rect.size.w / 2, \
-  temp_rect.origin.y + temp_rect.size.h / 2)
-
 #define center_in_rect(temp_size, temp_rect) GPoint( \
   temp_rect.origin.x + (temp_rect.size.w - temp_size.w) / 2, \
   temp_rect.origin.y + (temp_rect.size.h - temp_size.h) / 2)
