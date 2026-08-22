@@ -153,6 +153,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     }
   }
   #endif
+  
+  #undef SCALE_WITH_ANIMATION
 }
 
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
@@ -175,7 +177,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     s_mark_points = true;
   #else
     s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
-    s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
+    s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec / 10 * 10) / (60 * 60);
     if (settings.DebugSpeed) {
       s_hour_angle = s_minute_angle;
       s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
@@ -183,9 +185,12 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   #endif
   
   // Check if we need to move the date twice per minute, or on first load
-  s_mark_points = (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)) || ctx == NULL;
-  APP_LOG(APP_LOG_LEVEL_DEBUG, s_mark_points ? "Yes" : "No");
+  s_mark_points = settings.ShowDate && (ctx == NULL || (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)));
   if (s_mark_points) cells_reset_grid(cells_grids.fractal);
+  
+  if (!s_animation) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d %d %d %d", s_hour_angle, s_minute_angle, s_max_depth, s_length_mult_for_max_depth);
+  }
   
   // Draw fractal
   s_fractal_ctx = ctx;
@@ -196,10 +201,12 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
   
+  s_mark_points = false;
+  
   // Move/update date
   if (settings.ShowDate) {
     // Change the text every minute, or on first load
-    bool update_date = (!s_animation && t->tm_sec == 0) || ctx == NULL;
+    bool update_date = ctx == NULL || (!s_animation && t->tm_sec == 0);
     if (update_date) {
       static char date_buf[16];
       strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
@@ -209,7 +216,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     }
     
     // Move the date if the fractal passed over it, or on first load
-    bool move_date = cells_sensitive_overwritten() || ctx == NULL;
+    bool move_date = ctx == NULL || cells_sensitive_overwritten();
     if (move_date) {
       
       // Calculate the largest rect (expensive!)
@@ -232,7 +239,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       //cells_debug_print(cells_sensitive_grid);
     }
     
-    if (settings.DebugGrid && ctx != NULL) {
+    if (ctx != NULL && settings.DebugGrid) {
       if (!move_date)
         cells_update_largest_rect();
 
@@ -271,13 +278,14 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // Redraw the fractal every 10 seconds
-  if (settings.DebugSpeed || tick_time->tm_sec % 10 == 0) {
+  if (!s_animation && (settings.DebugSpeed || tick_time->tm_sec % 10 == 0)) {
 
     #ifdef SCREENSHOTMODE
     s_screenshot_frame = (s_screenshot_frame + 1) % 60;
     #endif
 
     layer_mark_dirty(s_fractal_layer);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: tick_handler");
   }
 }
 
@@ -286,7 +294,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
   s_max_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
   s_length_mult_for_max_depth = progress - (s_max_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Depth: %d\tprogress: %d", s_max_depth, s_length_mult_for_max_depth);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d)", s_max_depth, s_length_mult_for_max_depth);
   layer_mark_dirty(s_fractal_layer);
 }
 
@@ -333,6 +341,7 @@ static void focus_handler(bool focus) {
     s_max_depth = 0;
     s_length_mult_for_max_depth = 0;
     layer_mark_dirty(s_fractal_layer);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: focus_handler");
   }
 }
 
@@ -344,8 +353,10 @@ static void area_change_handler(GRect final_unobstructed_screen_area, void *ctx)
   
   if (delta_height > 0) {
     cells_mark_rect(cells_grids.screen, obstructed_area);
-    if (settings.ShowDate)
+    if (settings.ShowDate) {
       layer_mark_dirty(s_fractal_layer);
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: area_change_handler");
+    }
   }
 }
 

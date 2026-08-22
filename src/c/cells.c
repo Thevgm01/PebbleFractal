@@ -38,7 +38,7 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
         centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 9)
         
         // Mirror horizontally
-        ? (1 << x) | ((1 << (BITS - 1)) >> x) : 0;
+        ? (1 << x) | (1 << (BITS - 1 - x)) : 0;
     }
     // Mirror vertically
     cells_grids.base[y] = row;
@@ -154,7 +154,8 @@ void cells_mark_rect(grid_t grid[], GRect world_rect) {
   
   // Fill out the rows
   int16_t start_y = max(local_rect.origin.y, 0);
-  for (int16_t y = start_y; y <= start_y + min(local_rect.size.h, BITS - 1); y++) {
+  int16_t end_y = min(local_rect.origin.y + local_rect.size.h, BITS - 1);
+  for (int16_t y = start_y; y <= end_y; y++) {
     grid[y] |= row;
   }
 }
