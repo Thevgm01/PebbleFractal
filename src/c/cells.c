@@ -22,22 +22,22 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Pixels per cell: %d", cells_pixels_per_cell);
   
   // Block out corner cells
-  for (int16_t y = 0; y < BITS; y++) {
-    for (int16_t x = 0; x < BITS; x++) {
-      GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
-      #ifdef PBL_ROUND
-        if (centered.x * centered.x + centered.y * centered.y > BITS * BITS)
-          cells_grids.base[y] |= 1 << x;
-      #else
-        // Use four offset circles to approximate a squircle
-        const int16_t spread = BITS;
-        if ((centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 4 ||
-            (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 4 ||
-            centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 4 ||
-            centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 4)
-          cells_grids.base[y] |= 1 << x;
-      #endif
+  for (int16_t y = 0; y < BITS / 2; y++) {
+    grid_t row = 0;
+    for (int16_t x = 0; x < BITS / 2; x++) {
+      const GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
+      const int16_t spread = BITS;
+      row |= PBL_IF_ROUND_ELSE(centered.x * centered.x + centered.y * centered.y > BITS * BITS, 
+        
+        (centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 4 ||
+        (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 4 ||
+        centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 4 ||
+        centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 4)
+        
+        ? (1 << x) | ((1 << (BITS - 1)) >> x) : 0;
     }
+    cells_grids.base[y] = row;
+    cells_grids.base[BITS - 1 - y] = row;
   }
   
   // Block out center cells
