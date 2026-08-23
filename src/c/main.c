@@ -274,7 +274,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   
   graphics_context_set_antialiased(ctx, true);
   
-  int16_t radius = min(size.w, size.h) / 2;
+  int16_t radius = min(size.w, size.h) / 2 - 2;
     
   // Tick marks
   for (int8_t i = 0; i < 15; i++) {
@@ -290,7 +290,8 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
     int16_t x2 = cos * inner_r / TRIG_MAX_RATIO;
     int16_t y2 = sin * inner_r / TRIG_MAX_RATIO;
 
-    graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
+    //graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
+    graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
     graphics_draw_line(ctx, gpoint_add(center, x1, y1), gpoint_add(center, x2, y2));
     graphics_draw_line(ctx, gpoint_add(center, -y1, x1), gpoint_add(center, -y2, x2));
@@ -299,8 +300,10 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   }
   
   // Draw minute/hour notches  
-  GPoint hour = point_on_circle(center, s_hour_angle, radius + angle_to_squircle_offset(s_hour_angle) - 3);
-  GPoint minute = point_on_circle(center, s_minute_angle, radius + angle_to_squircle_offset(s_minute_angle) - 3);
+  GPoint hour = point_on_circle(center, s_hour_angle, radius +
+                                PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_hour_angle)) - 3);
+  GPoint minute = point_on_circle(center, s_minute_angle, radius +
+                                  PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)) - 3);
   GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 7);
 
   graphics_context_set_stroke_width(ctx, 3);
