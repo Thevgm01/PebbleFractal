@@ -37,13 +37,12 @@ static int16_t s_screenshot_frame = 0;
 
 // --- Drawing Functions --- //
 
-static GPoint add_to_gpoint(GPoint a, int16_t x, int16_t y) { return GPoint(a.x + x, a.y + y); }
 static GPoint add_gpoints(GPoint a, GPoint b) { return GPoint(a.x + b.x, a.y + b.y); }
 static GPoint sub_gpoints(GPoint a, GPoint b) { return GPoint(a.x - b.x, a.y - b.y); }
 
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
-  return add_to_gpoint(origin,
+  return gpoint_add(origin,
      sin_lookup(angle) * radius / TRIG_MAX_RATIO,
     -cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 }
@@ -256,6 +255,12 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
     }
   }
+  
+  // Draw minute/hour notches
+  //if (ctx != null) {
+  //  graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
+  //  graphics_draw_circle(ctx, point_on_circle(center, s_hour_angle, radius), radius)
+  //}
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -267,17 +272,25 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   int16_t squircleish_offsets[] = {0, 1, 2, 3, 5, 7, 10, 13, 13, 10, 7, 5, 3, 2, 1};
   
   // Tick marks
-  for (int8_t i = 0; i < 60; i++) {
+  for (int8_t i = 0; i < 15; i++) {
     int16_t angle = i * TRIG_MAX_ANGLE / 60;
     bool is_hour = (i % 5 == 0);
     int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, squircleish_offsets[i % 15]);
     int16_t inner_r = outer_r - (is_hour ? 12 : 5);
+    
+    int32_t cos = cos_lookup(angle);
+    int32_t sin = sin_lookup(angle);
+    int16_t x1 = cos * outer_r / TRIG_MAX_RATIO;
+    int16_t y1 = sin * outer_r / TRIG_MAX_RATIO;
+    int16_t x2 = cos * inner_r / TRIG_MAX_RATIO;
+    int16_t y2 = sin * inner_r / TRIG_MAX_RATIO;
 
     graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
-    graphics_draw_line(ctx,
-                       point_on_circle(center, angle, inner_r),
-                       point_on_circle(center, angle, outer_r));
+    graphics_draw_line(ctx, gpoint_add(center, x1, y1), gpoint_add(center, x2, y2));
+    graphics_draw_line(ctx, gpoint_add(center, -y1, x1), gpoint_add(center, -y2, x2));
+    graphics_draw_line(ctx, gpoint_add(center, -x1, -y1), gpoint_add(center, -x2, -y2));
+    graphics_draw_line(ctx, gpoint_add(center, y1, -x1), gpoint_add(center, y2, -x2));
   }
 }
 

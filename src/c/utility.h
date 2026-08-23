@@ -4,6 +4,8 @@
 #define min(temp_a, temp_b) (temp_a < temp_b ? temp_a : temp_b)
 #define max(temp_a, temp_b) (temp_a > temp_b ? temp_a : temp_b)
 
+#define gpoint_add(temp_point, temp_x, temp_y) (GPoint(temp_point.x + temp_x, temp_point.y + temp_y))
+
 #define is_even(temp_a) (temp_a % 2 == 0)
 #define is_odd(temp_a) (temp_a % 2 == 1)
 

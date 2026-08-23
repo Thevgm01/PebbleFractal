@@ -115,7 +115,7 @@ module.exports = [
         "messageKey": "WidthScale",
         "label": "Width Scale",
         "defaultValue": 0,
-        "description": "Experimental - Make the hands appear \"thicker\" towards the root",
+        "description": "Experimental - Make the hands appear \"thicker\" towards the top",
         "min": 0,
         "max": 0.5,
         "step": 0.05
