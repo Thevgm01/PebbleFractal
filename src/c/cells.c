@@ -32,6 +32,8 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
         centered.x * centered.x + centered.y * centered.y > BITS * BITS, 
         
         // Check 4 offset circles to approximate a squircle if rectangular
+        // This is an entirely different method than the one used to determine the notch offsets
+        // Just make sure they line up I guess
         (centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 9 ||
         (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 9 ||
         centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 9 ||
