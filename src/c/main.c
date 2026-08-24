@@ -42,7 +42,7 @@ static GPoint sub_gpoints(GPoint a, GPoint b) { return GPoint(a.x - b.x, a.y - b
 
 // Create a GPoint <radius> pixels away from <origin> rotated by <angle>
 static GPoint point_on_circle(GPoint origin, int16_t angle, int16_t radius) {
-  return gpoint_add(origin,
+  return gpoint_shift(origin,
      sin_lookup(angle) * radius / TRIG_MAX_RATIO,
     -cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 }
@@ -293,10 +293,10 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
     //graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
     graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
     graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
-    graphics_draw_line(ctx, gpoint_add(center, x1, y1), gpoint_add(center, x2, y2));
-    graphics_draw_line(ctx, gpoint_add(center, -y1, x1), gpoint_add(center, -y2, x2));
-    graphics_draw_line(ctx, gpoint_add(center, -x1, -y1), gpoint_add(center, -x2, -y2));
-    graphics_draw_line(ctx, gpoint_add(center, y1, -x1), gpoint_add(center, y2, -x2));
+    graphics_draw_line(ctx, gpoint_shift(center, x1, y1), gpoint_shift(center, x2, y2));
+    graphics_draw_line(ctx, gpoint_shift(center, -y1, x1), gpoint_shift(center, -y2, x2));
+    graphics_draw_line(ctx, gpoint_shift(center, -x1, -y1), gpoint_shift(center, -x2, -y2));
+    graphics_draw_line(ctx, gpoint_shift(center, y1, -x1), gpoint_shift(center, y2, -x2));
   }
   
   // Draw minute/hour notches  
@@ -304,19 +304,20 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
                                 PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_hour_angle)) - 3);
   GPoint minute = point_on_circle(center, s_minute_angle, radius +
                                   PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)) - 3);
-  GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 7);
+  GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 8);
 
-  graphics_context_set_stroke_width(ctx, 3);
   graphics_context_set_stroke_color(ctx, settings.BackgroundColor);
-  graphics_draw_circle(ctx, hour, 4);
-  graphics_draw_line(ctx, gpoint_add(minute, cross_offset.x, cross_offset.y), gpoint_add(minute, -cross_offset.x, -cross_offset.y));
-  graphics_draw_line(ctx, gpoint_add(minute, -cross_offset.y, cross_offset.x), gpoint_add(minute, cross_offset.y, -cross_offset.x));
+  graphics_context_set_stroke_width(ctx, 3);
+  graphics_draw_circle(ctx, hour, 8);
+  graphics_context_set_stroke_width(ctx, 7);
+  graphics_draw_line(ctx, gpoint_shift(minute, cross_offset.x, cross_offset.y), gpoint_shift(minute, -cross_offset.x, -cross_offset.y));
+  graphics_draw_line(ctx, gpoint_shift(minute, -cross_offset.y, cross_offset.x), gpoint_shift(minute, cross_offset.y, -cross_offset.x));
 
-  graphics_context_set_stroke_width(ctx, 1);
   graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
-  graphics_draw_circle(ctx, hour, 4);
-  graphics_draw_line(ctx, gpoint_add(minute, cross_offset.x, cross_offset.y), gpoint_add(minute, -cross_offset.x, -cross_offset.y));
-  graphics_draw_line(ctx, gpoint_add(minute, -cross_offset.y, cross_offset.x), gpoint_add(minute, cross_offset.y, -cross_offset.x));
+  graphics_context_set_stroke_width(ctx, 3);
+  graphics_draw_circle(ctx, hour, 6);
+  graphics_draw_line(ctx, gpoint_shift(minute, cross_offset.x, cross_offset.y), gpoint_shift(minute, -cross_offset.x, -cross_offset.y));
+  graphics_draw_line(ctx, gpoint_shift(minute, -cross_offset.y, cross_offset.x), gpoint_shift(minute, cross_offset.y, -cross_offset.x));
 }
 
 // --- Ticks --- //

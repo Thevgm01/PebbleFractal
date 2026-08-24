@@ -48,8 +48,15 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   }
   
   // Block out center cells
+  #if BITS == 16
   cells_grids.base[BITS / 2 - 1] |= 0b11 << (BITS / 2 - 1);
   cells_grids.base[BITS / 2]     |= 0b11 << (BITS / 2 - 1);
+  #elif BITS == 32
+  cells_grids.base[BITS / 2 - 2] |= 0b11 << (BITS / 2 - 1);
+  cells_grids.base[BITS / 2 - 1] |= 0b1111 << (BITS / 2 - 2);
+  cells_grids.base[BITS / 2]     |= 0b1111 << (BITS / 2 - 2);
+  cells_grids.base[BITS / 2 + 1] |= 0b11 << (BITS / 2 - 1);
+  #endif
 }
 
 void cells_reset_grid(grid_t grid[]) {
@@ -235,7 +242,8 @@ void cells_debug_draw(GContext *ctx) {
 void cells_debug_print(grid_t grid[]) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Address of grid: 0x%x", grid);
   for (int16_t y = 0; y < BITS; y += 2) {
-    static char output_row[BITS * 3];
+    static char output_row[BITS * 3 + 1];
+    output_row[BITS * 3] = '\0'; // Null termination
     for (int16_t x = 0; x < BITS; x++) {
       bool upper = grid[y] & (1 << x);
       bool lower = grid[y + 1] & (1 << x);
@@ -257,7 +265,7 @@ static int16_t gsize_score(GSize size) {
   // Rapidly gain score as we meet the minimum desired dimensions, but not if we exceed
   int16_t w_score = min(size.w * 1000 / min_size.w, 1000);
   int16_t h_score = min(size.h * 1000 / min_size.h, 1000);
-  // Somewhat prefer wider rects, even if they technically have the same area as a tall rect
+  // 5 is a magic number, basically ends up preferring wider rects even if they have the same area as tall rects
   return size.w * (size.h + 5) + w_score + h_score;
 }
 

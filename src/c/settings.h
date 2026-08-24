@@ -51,9 +51,12 @@ static void settings_load() {
 static void settings_inbox_received_callback(DictionaryIterator *iterator, void *ctx) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed, reading...");
   
-  #define LOAD_COLOR(var, key) (var) = (GColorFromHEX(dict_find(iterator, key)->value->int32))
-  #define LOAD_INT(var, key) (var) = (dict_find(iterator, key)->value->int32)
-  #define LOAD_BOOL(var, key) (var) = (dict_find(iterator, key)->value->int32 == 1)
+  Tuple *t;
+  
+  #define LOAD(key) t = dict_find(iterator, key)
+  #define LOAD_COLOR(var, key) { LOAD(key); if (t) (var) = (GColorFromHEX(t->value->int32)); }
+  #define LOAD_INT(var, key) { LOAD(key); if (t) (var) = (t->value->int32); }
+  #define LOAD_BOOL(var, key) { LOAD(key); if (t) (var) = (t->value->int32 == 1); }
   LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
   LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
   LOAD_COLOR(settings.TertiaryColor, MESSAGE_KEY_TertiaryColor);
@@ -66,12 +69,25 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
   LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
   LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
+  #undef LOAD
   #undef LOAD_COLOR
   #undef LOAD_INT
   #undef LOAD_BOOL
-  settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
+  
+  // The "select" type in Clay always returns a string, so we have to convert it to an int
+  t = dict_find(iterator, MESSAGE_KEY_Font);
+  if (t) settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
+  
+  // During recursion, the hour hand's length is calculated as a ratio of the minute hand's length
+  // Thus if the hour hand is longer than the minute hand, that ratio will be greater than 1
+  // If that, times the recursion ratio, is 1 or greater, then the fractal ends up growing instead of shrinking
+  // So, we clamp the hour hand so it can't ever be bigger than the minute hand
+  
+  // Perhaps a better solution would swap the recursion multiplication order if the sizes are inverted
+  // Then again, what twisted soul is going to make the hour hand longer than the minute hand?
   settings.HourHandLength = min(settings.MinuteHandLength, settings.HourHandLength);
 
   settings_save();
-  settings_loaded_callback();
+  
+  if (settings_loaded_callback) settings_loaded_callback();
 }
