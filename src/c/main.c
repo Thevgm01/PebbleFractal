@@ -274,36 +274,45 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   
   graphics_context_set_antialiased(ctx, true);
   
-  int16_t radius = min(size.w, size.h) / 2 - 2;
+  int16_t radius = min(size.w, size.h) / 2 - 8;
     
   // Tick marks
   for (int8_t i = 0; i < 15; i++) {
     int16_t angle = i * TRIG_MAX_ANGLE / 60;
     bool is_hour = (i % 5 == 0);
     int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(angle));
-    int16_t inner_r = outer_r - (is_hour ? 12 : 5);
     
     int32_t cos = cos_lookup(angle);
     int32_t sin = sin_lookup(angle);
     int16_t x1 = cos * outer_r / TRIG_MAX_RATIO;
     int16_t y1 = sin * outer_r / TRIG_MAX_RATIO;
-    int16_t x2 = cos * inner_r / TRIG_MAX_RATIO;
-    int16_t y2 = sin * inner_r / TRIG_MAX_RATIO;
-
+    
     //graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
-    graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
-    graphics_context_set_stroke_width(ctx, is_hour ? 3 : 1);
-    graphics_draw_line(ctx, gpoint_shift(center, x1, y1), gpoint_shift(center, x2, y2));
-    graphics_draw_line(ctx, gpoint_shift(center, -y1, x1), gpoint_shift(center, -y2, x2));
-    graphics_draw_line(ctx, gpoint_shift(center, -x1, -y1), gpoint_shift(center, -x2, -y2));
-    graphics_draw_line(ctx, gpoint_shift(center, y1, -x1), gpoint_shift(center, y2, -x2));
+    if (is_hour) {
+      int16_t inner_r = outer_r - 8;
+      int16_t x2 = cos * inner_r / TRIG_MAX_RATIO;
+      int16_t y2 = sin * inner_r / TRIG_MAX_RATIO;
+      graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
+      graphics_context_set_stroke_width(ctx, 3);
+      graphics_draw_line(ctx, gpoint_shift(center, x1, y1), gpoint_shift(center, x2, y2));
+      graphics_draw_line(ctx, gpoint_shift(center, -y1, x1), gpoint_shift(center, -y2, x2));
+      graphics_draw_line(ctx, gpoint_shift(center, -x1, -y1), gpoint_shift(center, -x2, -y2));
+      graphics_draw_line(ctx, gpoint_shift(center, y1, -x1), gpoint_shift(center, y2, -x2));
+    }
+    else {
+      graphics_context_set_fill_color(ctx, settings.PrimaryColor);
+      graphics_fill_circle(ctx, gpoint_shift(center, x1, y1), 1);
+      graphics_fill_circle(ctx, gpoint_shift(center, -y1, x1), 1);
+      graphics_fill_circle(ctx, gpoint_shift(center, -x1, -y1), 1);
+      graphics_fill_circle(ctx, gpoint_shift(center, y1, -x1), 1);
+    }
   }
   
   // Draw minute/hour notches  
   GPoint hour = point_on_circle(center, s_hour_angle, radius +
-                                PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_hour_angle)) - 3);
+                                PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_hour_angle)));
   GPoint minute = point_on_circle(center, s_minute_angle, radius +
-                                  PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)) - 3);
+                                  PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)));
   GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 8);
 
   graphics_context_set_stroke_color(ctx, settings.BackgroundColor);
