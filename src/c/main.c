@@ -98,7 +98,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * settings.WidthScale / 100;
   
   // Set the colors based on the line length
-  if (depth == 0)
+  if (length > settings.MinuteHandLength / 2)
     // Make the hands white for the uppermost layer
     graphics_context_set_stroke_color(s_fractal_ctx, settings.PrimaryColor);
   else if (length > settings.MinuteHandLength / 6)
