@@ -241,7 +241,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
       APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
       
       cells_reset_grid(cells_grids.sensitive);
-      cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
+      cells_sensitive_force = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
       //cells_debug_print(cells_sensitive_grid);
     }
     
@@ -314,14 +314,14 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   GPoint minute = point_on_circle(center, s_minute_angle, radius +
                                   PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)));
   GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 8);
-
+  /*
   graphics_context_set_stroke_color(ctx, settings.BackgroundColor);
   graphics_context_set_stroke_width(ctx, 3);
   graphics_draw_circle(ctx, hour, 8);
   graphics_context_set_stroke_width(ctx, 7);
   graphics_draw_line(ctx, gpoint_shift(minute, cross_offset.x, cross_offset.y), gpoint_shift(minute, -cross_offset.x, -cross_offset.y));
   graphics_draw_line(ctx, gpoint_shift(minute, -cross_offset.y, cross_offset.x), gpoint_shift(minute, cross_offset.y, -cross_offset.x));
-
+  */
   graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
   graphics_context_set_stroke_width(ctx, 3);
   graphics_draw_circle(ctx, hour, 6);

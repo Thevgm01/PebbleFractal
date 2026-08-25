@@ -5,6 +5,7 @@
 CellsGrids cells_grids;
 GRect cells_largest_rect;
 int16_t cells_pixels_per_cell;
+bool cells_sensitive_force;
 
 GRect screen_region;
 GSize min_size;
@@ -145,9 +146,11 @@ void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destintati
   }
 }
 
-void cells_mark_rect(grid_t grid[], GRect world_rect) {
+// Return true if the rect was fully bounds
+bool cells_mark_rect(grid_t grid[], GRect world_rect) {
   
   GRect local_rect = cells_world_to_local_rect(world_rect);
+  GRect original_local_rect = local_rect;
   
   // If we're over the left edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {
@@ -167,11 +170,15 @@ void cells_mark_rect(grid_t grid[], GRect world_rect) {
   for (int16_t y = start_y; y <= end_y; y++) {
     grid[y] |= row;
   }
+  
+  return grect_equal(&local_rect, &original_local_rect);
 }
 
 bool cells_sensitive_overwritten() {
+  if (cells_sensitive_force)
+    return true; // If the sensitive cells were outside the bounds, always consider them overwritten
   for (int16_t y = 0; y < BITS; y++)
-    if ((cells_grids.fractal[y] | cells_grids.screen[y]) & cells_grids.sensitive[y])
+    if ((cells_grids.base[y] | cells_grids.fractal[y] | cells_grids.screen[y]) & cells_grids.sensitive[y])
       return true;
   return false;
 }
