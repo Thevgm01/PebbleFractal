@@ -25,7 +25,6 @@ static int8_t s_max_animation_depth;
 static int16_t s_length_mult_for_max_depth;
 
 // Fractal drawing
-static int16_t s_hour_hand_scale;
 static uint16_t s_hour_angle;
 static uint16_t s_minute_angle;
 static GContext *s_fractal_ctx;
@@ -51,32 +50,33 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
   return (angle1 + angle2) % TRIG_MAX_ANGLE;
 }
 
-static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
+static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t scale, int8_t depth) {
   #define SCALE_WITH_ANIMATION(var) var * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX
   #define TRUE_HAND_LENGTH settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength
   
   // Animate the length per depth
-  if (depth == s_max_animation_depth) length = SCALE_WITH_ANIMATION(length);
+  if (depth == s_max_animation_depth) scale = SCALE_WITH_ANIMATION(scale);
   
   // Early return if our length is zero (nothing to draw)
-  if (length == 0)
+  if (scale == 0)
     return;
-  int16_t hour_length = length * s_hour_hand_scale / 100;
   
   // Figure out where our hands should be pointing
   int16_t new_hour_angle = add_angles2(base_angle, s_hour_angle);
   int16_t new_minute_angle = add_angles2(base_angle, s_minute_angle);
-  GPoint minute_point = point_on_circle(origin, new_minute_angle, length);
-  GPoint hour_point = point_on_circle(origin, new_hour_angle, hour_length);
+  int16_t minute_length = scale * settings.MinuteHandLength / 1000;
+  int16_t hour_length = scale * settings.HourHandLength / 1000;
+  GPoint minute_point = point_on_circle(origin, new_minute_angle, scale * settings.MinuteHandLength / 1000);
+  GPoint hour_point = point_on_circle(origin, new_hour_angle, scale * settings.HourHandLength / 1000);
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
     if (depth == 0) {
-      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_minute_angle, length + TRUE_HAND_LENGTH));
-      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_hour_angle, (length + TRUE_HAND_LENGTH) * s_hour_hand_scale / 100));
+      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_minute_angle, minute_length + TRUE_HAND_LENGTH));
+      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_hour_angle, hour_length + TRUE_HAND_LENGTH));
     }
     else {
-      if (length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
+      if (minute_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
       else cells_mark_point(cells_grids.fractal, minute_point);
       
       if (hour_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, hour_point);
@@ -86,8 +86,8 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Recurse before drawing so that earlier branches appear on top
   if (depth < s_max_animation_depth) {
-    draw_hands_recursive(minute_point, new_minute_angle, length * settings.RecurseScale / 100, depth + 1);
-    draw_hands_recursive(hour_point, new_hour_angle, length * s_hour_hand_scale * settings.RecurseScale / 10000, depth + 1);
+    draw_hands_recursive(minute_point, new_minute_angle, scale * settings.RecurseScale / 100, depth + 1);
+    draw_hands_recursive(hour_point, new_hour_angle, scale * settings.RecurseScale / 100, depth + 1);
   }
     
   // Return if we have no context to draw to (will only happen during the first run for initial date placement)
@@ -98,10 +98,10 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * settings.WidthScale / 100;
   
   // Set the colors based on the line length
-  if (length > settings.MinuteHandLength / 2)
+  if (minute_length > settings.MinuteHandLength / 2)
     // Make the hands white for the uppermost layer
     graphics_context_set_stroke_color(s_fractal_ctx, settings.PrimaryColor);
-  else if (length > settings.MinuteHandLength / 6)
+  else if (minute_length > settings.MinuteHandLength / 6)
     graphics_context_set_stroke_color(s_fractal_ctx, settings.SecondaryColor);
   else
     graphics_context_set_stroke_color(s_fractal_ctx, settings.TertiaryColor);
@@ -116,7 +116,7 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
     }
   #else // Draw lines
     if (half_width <= 1) { // Hands are thin, draw them as individual lines
-      if (length > 1) {
+      if (minute_length > 1) {
         graphics_draw_line(s_fractal_ctx, origin, minute_point);
         graphics_draw_line(s_fractal_ctx, origin, hour_point);
       } else { // Line's too short, draw a point
@@ -154,9 +154,9 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
       int16_t true_hand_length = TRUE_HAND_LENGTH;
       if (s_max_animation_depth == 1) true_hand_length = SCALE_WITH_ANIMATION(true_hand_length);
       graphics_draw_line(s_fractal_ctx, minute_point,
-                         point_on_circle(origin, s_minute_angle, length + true_hand_length));
+                         point_on_circle(origin, s_minute_angle, minute_length + true_hand_length));
       graphics_draw_line(s_fractal_ctx, hour_point,
-                         point_on_circle(origin, s_hour_angle, (length + true_hand_length) * s_hour_hand_scale / 100));
+                         point_on_circle(origin, s_hour_angle, hour_length + true_hand_length));
     }
   }
   #endif
@@ -205,7 +205,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_antialiased(ctx, false);
     graphics_context_set_stroke_width(ctx, 1);
   }
-  draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
+  draw_hands_recursive(center, 0, 1000, 0);
   
   s_mark_points = false;
   
@@ -378,9 +378,7 @@ static void post_settings_loaded() {
   text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
   window_set_background_color(s_window, settings.BackgroundColor);
   layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
-  
-  s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
-  
+    
   if (settings.ShowDate) {
     animation_stopped_proc(s_animation, false, NULL);
     
