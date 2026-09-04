@@ -42,3 +42,13 @@
   temp_int & 0x0004 ? '1' : '0', \
   temp_int & 0x0002 ? '1' : '0', \
   temp_int & 0x0001 ? '1' : '0')
+
+static int16_t squircle_offset_from_angle(int32_t angle) {
+  // Angle goes from 0-TRIG_MAX_ANGLE
+  // Constrain to the first 90°
+  angle = angle % (TRIG_MAX_ANGLE / 4);
+  // Reverse direction if between 45° and 90°
+  if (angle > TRIG_MAX_ANGLE / 8) angle = TRIG_MAX_ANGLE / 4 - angle;
+  // Calculate offset
+  return angle * angle / 3000000;
+}

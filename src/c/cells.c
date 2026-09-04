@@ -27,21 +27,20 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
     grid_t row = 0;
     for (int16_t x = 0; x < BITS / 2; x++) {
       const GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
-      const int16_t spread = BITS * 2;
-      row |= PBL_IF_ROUND_ELSE(
-        // Simple radius check if round
-        centered.x * centered.x + centered.y * centered.y > BITS * BITS, 
-        
-        // Check 4 offset circles to approximate a squircle if rectangular
-        // This is an entirely different method than the one used to determine the notch offsets
-        // Just make sure they line up I guess
-        (centered.x - spread) * (centered.x - spread) + centered.y * centered.y > BITS * BITS * 9 ||
-        (centered.x + spread) * (centered.x + spread) + centered.y * centered.y > BITS * BITS * 9 ||
-        centered.x * centered.x + (centered.y - spread) * (centered.y - spread) > BITS * BITS * 9 ||
-        centered.x * centered.x + (centered.y + spread) * (centered.y + spread) > BITS * BITS * 9)
-        
-        // Mirror horizontally
-        ? (1 << x) | (1 << (BITS - 1 - x)) : 0;
+      int16_t sqr_distance = centered.x * centered.x + centered.y * centered.y;
+      #define bit_mirror(temp_x, temp_BITS) ((1 << temp_x) | (1 << (temp_BITS - 1 - temp_x)))
+      #ifdef PBL_ROUND
+        if (sqr_distance > BITS * BITS) {
+          row |= bit_mirror(x, BITS);
+        }
+      #else
+        int32_t angle = atan2_lookup(centered.y, centered.x);
+        int16_t offset = squircle_offset_from_angle(angle);
+        if (sqr_distance > (diameter + offset) * (diameter + offset) * 4 / (BITS * BITS)) {
+          row |= bit_mirror(x, BITS);
+        }
+      #endif
+      #undef bit_mirror
     }
     // Mirror vertically
     cells_grids.base[y] = row;
@@ -50,13 +49,13 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   
   // Block out center cells
   #if BITS == 16
-  cells_grids.base[BITS / 2 - 1] |= 0b11 << (BITS / 2 - 1);
-  cells_grids.base[BITS / 2]     |= 0b11 << (BITS / 2 - 1);
+  cells_grids.base[7] |= 0b11 << 7;
+  cells_grids.base[8] |= 0b11 << 7;
   #elif BITS == 32
-  cells_grids.base[BITS / 2 - 2] |= 0b11 << (BITS / 2 - 1);
-  cells_grids.base[BITS / 2 - 1] |= 0b1111 << (BITS / 2 - 2);
-  cells_grids.base[BITS / 2]     |= 0b1111 << (BITS / 2 - 2);
-  cells_grids.base[BITS / 2 + 1] |= 0b11 << (BITS / 2 - 1);
+  cells_grids.base[14] |= 0b11 << 15;
+  cells_grids.base[15] |= 0b1111 << 14;
+  cells_grids.base[16] |= 0b1111 << 14;
+  cells_grids.base[17] |= 0b11 << 15;
   #endif
 }
 
