@@ -76,7 +76,7 @@ module.exports = [
         "type": "slider",
         "messageKey": "MinuteHandLength",
         "label": "Minute Hand Length",
-        "defaultValue": 60,
+        "defaultValue": 40,
         "min": 0,
         "max": 100,
         "step": 5
@@ -85,7 +85,7 @@ module.exports = [
         "type": "slider",
         "messageKey": "HourHandLength",
         "label": "Hour Hand Length",
-        "defaultValue": 40,
+        "defaultValue": 30,
         "description": "Must not be longer than the minute hand",
         "min": 0,
         "max": 100,
@@ -95,7 +95,7 @@ module.exports = [
         "type": "slider",
         "messageKey": "RecurseScale",
         "label": "Recurse Scale",
-        "defaultValue": 0.8,
+        "defaultValue": 0.85,
         "min": 0.5,
         "max": 1,
         "step": 0.01

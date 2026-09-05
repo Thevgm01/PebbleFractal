@@ -28,9 +28,9 @@ static void settings_restore_default() {
   settings.TertiaryColor = GColorDarkGray;
   settings.BackgroundColor = GColorBlack;
   settings.ShowDate = true;
-  settings.MinuteHandLength = 60;
-  settings.HourHandLength = 40;
-  settings.RecurseScale = 80;
+  settings.MinuteHandLength = 40;
+  settings.HourHandLength = 30;
+  settings.RecurseScale = 85;
   settings.WidthScale = 0;
   settings.FirstHandScale = 1;
   settings.Font = 18;
