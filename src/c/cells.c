@@ -28,19 +28,18 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
     for (int16_t x = 0; x < BITS / 2; x++) {
       const GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
       int16_t sqr_distance = centered.x * centered.x + centered.y * centered.y;
-      #define bit_mirror(temp_x, temp_BITS) ((1 << temp_x) | (1 << (temp_BITS - 1 - temp_x)))
       #ifdef PBL_ROUND
         if (sqr_distance > BITS * BITS) {
-          row |= bit_mirror(x, BITS);
+          row |= (1 << x) | (1 << (BITS - 1 - x));
         }
       #else
         int32_t angle = atan2_lookup(centered.y, centered.x);
-        int16_t offset = squircle_offset_from_angle(angle);
-        if (sqr_distance > (diameter + offset) * (diameter + offset) * 4 / (BITS * BITS)) {
-          row |= bit_mirror(x, BITS);
+        int16_t offset = squircle_offset_from_angle(angle) * 2; // Double because the centered coordinates are halved
+        if (sqr_distance * screen_region.size.h * screen_region.size.w / (BITS * BITS) > // Remap the sqr_distance into pixel space
+            (screen_region.size.w + offset) * (screen_region.size.h + offset)) { // Calculate the squircle edge distance
+          row |= (1 << x) | (1 << (BITS - 1 - x));
         }
       #endif
-      #undef bit_mirror
     }
     // Mirror vertically
     cells_grids.base[y] = row;
@@ -49,13 +48,13 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
   
   // Block out center cells
   #if BITS == 16
-  cells_grids.base[7] |= 0b11 << 7;
-  cells_grids.base[8] |= 0b11 << 7;
+    cells_grids.base[7] |= 0b11 << 7;
+    cells_grids.base[8] |= 0b11 << 7;
   #elif BITS == 32
-  cells_grids.base[14] |= 0b11 << 15;
-  cells_grids.base[15] |= 0b1111 << 14;
-  cells_grids.base[16] |= 0b1111 << 14;
-  cells_grids.base[17] |= 0b11 << 15;
+    cells_grids.base[14] |= 0b11 << 15;
+    cells_grids.base[15] |= 0b1111 << 14;
+    cells_grids.base[16] |= 0b1111 << 14;
+    cells_grids.base[17] |= 0b11 << 15;
   #endif
 }
 

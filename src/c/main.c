@@ -8,7 +8,7 @@
 //#define CIRCLES
 
 #define MAX_RECURSION_DEPTH 13
-#define DATE_CROP 4
+#define DATE_CROP 0
 
 // --- Static Variables --- //
 
@@ -385,7 +385,6 @@ static void post_settings_loaded() {
     animation_stopped_proc(s_animation, false, NULL);
     
     GFont font;
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", settings.Font);
     switch (settings.Font) {
       case 0: font = fonts_get_system_font(FONT_KEY_GOTHIC_14); break;
       case 1: font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD); break;
