@@ -159,8 +159,8 @@ bool cells_mark_rect(grid_t grid[], GRect world_rect) {
   // If we're over the right edge, shrink size
   local_rect.size.w = min(BITS, local_rect.size.w + 1);
   
-  // This might fail if the size is wider than BITS? Not 100% sure
-  grid_t row = ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
+  // Form a row of the rect in bits
+  grid_t row = local_rect.size.w >= BITS ? ~0 : ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
   
   // Fill out the rows
   int16_t start_y = max(local_rect.origin.y, 0);
@@ -191,9 +191,11 @@ GPoint cells_world_to_local_point(GPoint point) {
     (point.y - screen_region.origin.y) * BITS / screen_region.size.h);
 }
 
-GRect cells_world_to_local_rect(GRect rect) {  
-  GPoint lower_right = GPoint(rect.origin.x + rect.size.w, rect.origin.y + rect.size.h);
-  GPoint local_upper_left = cells_world_to_local_point(rect.origin);
+GRect cells_world_to_local_rect(GRect rect) {
+  int16_t center_offset = cells_pixels_per_cell / 2;
+  GPoint lower_right = GPoint(rect.origin.x + rect.size.w - center_offset - 1, rect.origin.y + rect.size.h - center_offset - 1);
+  
+  GPoint local_upper_left = cells_world_to_local_point(gpoint_shift(rect.origin, center_offset, center_offset));
   GPoint local_lower_right = cells_world_to_local_point(lower_right);
   
   return GRect(
