@@ -32,6 +32,12 @@ static GContext *s_fractal_ctx;
 static bool s_mark_points;
 static GRect s_date_rect;
 
+static GPath *s_primary_hand_path = NULL;
+static const GPathInfo PRIMARY_HAND_PATH_INFO = {
+  .num_points = 3,
+  .points = (GPoint[]) {{0, 0}, {0, 0}, {0, 0}}
+};
+
 // Screenshot mode
 static int16_t s_screenshot_frame = 0;
 
@@ -51,16 +57,15 @@ static int32_t add_angles2(int16_t angle1, int16_t angle2) {
   return (angle1 + angle2) % TRIG_MAX_ANGLE;
 }
 
-static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {
-  #define SCALE_WITH_ANIMATION(var) var * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX
-  #define TRUE_HAND_LENGTH settings.MinuteHandLength * settings.FirstHandScale / 100 - settings.MinuteHandLength
-  
+static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t length, int8_t depth) {  
   // Animate the length per depth
-  if (depth == s_max_animation_depth) length = SCALE_WITH_ANIMATION(length);
+  if (depth == s_max_animation_depth)
+    length = length * s_length_mult_for_max_depth * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
   
   // Early return if our length is zero (nothing to draw)
   if (length == 0)
     return;
+  
   int16_t hour_length = length * s_hour_hand_scale / 100;
   
   // Figure out where our hands should be pointing
@@ -71,17 +76,11 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   
   // Mark the next points occupied for determining the date placement
   if (s_mark_points) {
-    if (depth == 0) {
-      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_minute_angle, length + TRUE_HAND_LENGTH));
-      cells_mark_line(cells_grids.fractal, origin, point_on_circle(origin, s_hour_angle, (length + TRUE_HAND_LENGTH) * s_hour_hand_scale / 100));
-    }
-    else {
-      if (length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
-      else cells_mark_point(cells_grids.fractal, minute_point);
-      
-      if (hour_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, hour_point);
-      else cells_mark_point(cells_grids.fractal, hour_point);
-    }
+    if (length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, minute_point);
+    else cells_mark_point(cells_grids.fractal, minute_point);
+
+    if (hour_length > cells_pixels_per_cell * 3) cells_mark_line(cells_grids.fractal, origin, hour_point);
+    else cells_mark_point(cells_grids.fractal, hour_point);
   }
   
   // Recurse before drawing so that earlier branches appear on top
@@ -142,26 +141,60 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
                          point_on_circle(origin, hour_normal_angle, -half_width), 
                          point_on_circle(hour_point, hour_normal_angle, -next_half_width));
     }
-  
-  if (depth == 0) {
-    if (half_width > 1) {
-      // Draw a circle at the very center
-      graphics_draw_circle(s_fractal_ctx, origin, half_width);
-    }
-
-    // Draw additional long lines for the true hands
-    if (settings.FirstHandScale > 0 && s_max_animation_depth >= 1) {
-      int16_t true_hand_length = TRUE_HAND_LENGTH;
-      if (s_max_animation_depth == 1) true_hand_length = SCALE_WITH_ANIMATION(true_hand_length);
-      graphics_draw_line(s_fractal_ctx, minute_point,
-                         point_on_circle(origin, s_minute_angle, length + true_hand_length));
-      graphics_draw_line(s_fractal_ctx, hour_point,
-                         point_on_circle(origin, s_hour_angle, (length + true_hand_length) * s_hour_hand_scale / 100));
-    }
-  }
   #endif
-  
-  #undef SCALE_WITH_ANIMATION
+}
+
+static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t angle, int16_t length, int16_t width) {
+  GPoint side_offset = point_on_circle(GPointZero, add_angles2(angle, TRIG_MAX_ANGLE / 4), width);
+  points[0] = gpoint_shift(center, -side_offset.x, -side_offset.y);
+  points[1] = point_on_circle(center, angle, length);
+  points[2] = gpoint_shift(center, side_offset.x, side_offset.y);
+}
+
+static void move_date(tm* t, GContext *ctx) {
+  // Change the text every minute, or on first load
+  bool update_date = ctx == NULL || (!s_animation && t->tm_sec == 0);
+  if (update_date) {
+    static char date_buf[16];
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+    text_layer_set_text(s_date_layer, date_buf);
+    s_date_rect.size = text_layer_get_content_size(s_date_layer);
+    cells_set_min_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
+  }
+
+  // Move the date if the fractal passed over it, or on first load
+  bool move_date = ctx == NULL || cells_sensitive_overwritten();
+  if (move_date) {
+
+    // Calculate the largest rect (expensive!)
+    cells_update_largest_rect();
+
+    s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
+
+    // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
+    // Probably needs to be adjusted on a per-font-basis
+    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
+      s_date_rect.origin.x, 
+      s_date_rect.origin.y - 4, 
+      200, 
+      30));
+
+    APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
+
+    cells_reset_grid(cells_grids.sensitive);
+    cells_sensitive_force = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
+    //cells_debug_print(cells_sensitive_grid);
+  }
+
+  if (ctx != NULL && settings.DebugGrid) {
+    if (!move_date)
+      cells_update_largest_rect();
+
+    cells_debug_draw(ctx);
+
+    graphics_context_set_stroke_color(ctx, GColorCyan);
+    graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
+  }
 }
 
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
@@ -207,64 +240,33 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   }
   draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
   
+  // Stop marking points
   s_mark_points = false;
+
+  // Draw the primary hands
+  if (ctx != NULL) {
+    graphics_context_set_fill_color(ctx, settings.BackgroundColor);
+    graphics_context_set_antialiased(ctx, true);
+    graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
+    
+    int16_t width = 5;
+    
+    graphics_fill_circle(ctx, center, width - 1);
+    graphics_draw_circle(ctx, center, width - 1);
+
+    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_minute_angle, settings.MinuteHandLength, width);
+    gpath_draw_filled(ctx, s_primary_hand_path);
+    gpath_draw_outline_open(ctx, s_primary_hand_path);
+    
+    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_hour_angle, settings.HourHandLength, width);
+    gpath_draw_filled(ctx, s_primary_hand_path);
+    gpath_draw_outline_open(ctx, s_primary_hand_path);
+  }
   
   // Move/update date
   if (settings.ShowDate) {
-    // Change the text every minute, or on first load
-    bool update_date = ctx == NULL || (!s_animation && t->tm_sec == 0);
-    if (update_date) {
-      static char date_buf[16];
-      strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-      text_layer_set_text(s_date_layer, date_buf);
-      s_date_rect.size = text_layer_get_content_size(s_date_layer);
-      cells_set_min_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
-    }
-    
-    // Move the date if the fractal passed over it, or on first load
-    bool move_date = ctx == NULL || cells_sensitive_overwritten();
-    if (move_date) {
-      
-      // Calculate the largest rect (expensive!)
-      cells_update_largest_rect();
-      
-      s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
-      
-      // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
-      // Probably needs to be adjusted on a per-font-basis
-      layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
-        s_date_rect.origin.x, 
-        s_date_rect.origin.y - 4, 
-        200, 
-        30));
-      
-      APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
-      
-      cells_reset_grid(cells_grids.sensitive);
-      cells_sensitive_force = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
-      //cells_debug_print(cells_sensitive_grid);
-    }
-    
-    if (ctx != NULL && settings.DebugGrid) {
-      if (!move_date)
-        cells_update_largest_rect();
-
-      cells_debug_draw(ctx);
-
-      graphics_context_set_stroke_color(ctx, GColorCyan);
-      graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
-    }
+    move_date(t, ctx);
   }
-}
-
-static int16_t angle_to_squircle_offset(int32_t angle) {
-  // Angle goes from 0-TRIG_MAX_ANGLE
-  // Constrain to the first 90°
-  angle = angle % (TRIG_MAX_ANGLE / 4);
-  // Reverse direction if between 45° and 90°
-  if (angle > TRIG_MAX_ANGLE / 8) angle = TRIG_MAX_ANGLE / 4 - angle;
-  // Calculate offset
-  return angle * angle / 3000000;
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
@@ -280,7 +282,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   for (int8_t i = 0; i < 15; i++) {
     int16_t angle = i * TRIG_MAX_ANGLE / 60;
     bool is_hour = (i % 5 == 0);
-    int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(angle));
+    int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(angle));
     
     int32_t cos = cos_lookup(angle);
     int32_t sin = sin_lookup(angle);
@@ -309,10 +311,10 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   }
   
   // Draw minute/hour notches  
-  GPoint hour = point_on_circle(center, s_hour_angle, radius +
-                                PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_hour_angle)));
+  GPoint hour   = point_on_circle(center, s_hour_angle, radius +
+                                  PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(s_hour_angle)));
   GPoint minute = point_on_circle(center, s_minute_angle, radius +
-                                  PBL_IF_ROUND_ELSE(0, angle_to_squircle_offset(s_minute_angle)));
+                                  PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(s_minute_angle)));
   GPoint cross_offset = point_on_circle(GPointZero, s_minute_angle, 8);
   /*
   graphics_context_set_stroke_color(ctx, settings.BackgroundColor);
@@ -502,9 +504,13 @@ static void init(void) {
   // The fractal can change a lot over a short time,
   // so tick every second even though we only have a minute hand
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
+  
+  // Initialize the primary hand path
+  s_primary_hand_path = gpath_create(&PRIMARY_HAND_PATH_INFO);
 }
 
 static void deinit(void) {
+  gpath_destroy(s_primary_hand_path);
   tick_timer_service_unsubscribe();
   window_destroy(s_window);
   app_message_deregister_callbacks();
