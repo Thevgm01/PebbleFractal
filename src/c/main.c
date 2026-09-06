@@ -34,8 +34,8 @@ static GRect s_date_rect;
 
 static GPath *s_primary_hand_path = NULL;
 static const GPathInfo PRIMARY_HAND_PATH_INFO = {
-  .num_points = 3,
-  .points = (GPoint[]) {{0, 0}, {0, 0}, {0, 0}}
+  .num_points = 4,
+  .points = (GPoint[4]) {{0, 0}, {0, 0}, {0, 0}, {0, 0}}
 };
 
 // Screenshot mode
@@ -145,10 +145,15 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
 }
 
 static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t angle, int16_t length, int16_t width) {
-  GPoint side_offset = point_on_circle(GPointZero, add_angles2(angle, TRIG_MAX_ANGLE / 4), width);
+  int32_t right_angle = add_angles2(angle, TRIG_MAX_ANGLE / 4);
+  int16_t axis_aligned_offset = angle % (TRIG_MAX_ANGLE / 4) == 0 ? 1 : 0;
+  GPoint side_offset = point_on_circle(GPointZero, right_angle, width - axis_aligned_offset);
+  GPoint tip = point_on_circle(center, angle, length);
+  GPoint tip_offset = point_on_circle(GPointZero, right_angle, 2 - axis_aligned_offset);
   points[0] = gpoint_shift(center, -side_offset.x, -side_offset.y);
-  points[1] = point_on_circle(center, angle, length);
-  points[2] = gpoint_shift(center, side_offset.x, side_offset.y);
+  points[1] = gpoint_shift(tip, -tip_offset.x, -tip_offset.y);
+  points[2] = gpoint_shift(tip, tip_offset.x, tip_offset.y);
+  points[3] = gpoint_shift(center, side_offset.x, side_offset.y);
 }
 
 static void move_date(tm* t, GContext *ctx) {
@@ -245,22 +250,16 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
 
   // Draw the primary hands
   if (ctx != NULL) {
-    graphics_context_set_fill_color(ctx, settings.BackgroundColor);
     graphics_context_set_antialiased(ctx, true);
-    graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
+    graphics_context_set_fill_color(ctx, settings.PrimaryColor);
     
     int16_t width = 5;
-    
-    graphics_fill_circle(ctx, center, width - 1);
-    graphics_draw_circle(ctx, center, width - 1);
 
+    graphics_fill_circle(ctx, center, width - 2);
     gpath_isosceles_triangle(s_primary_hand_path->points, center, s_minute_angle, settings.MinuteHandLength, width);
     gpath_draw_filled(ctx, s_primary_hand_path);
-    gpath_draw_outline_open(ctx, s_primary_hand_path);
-    
     gpath_isosceles_triangle(s_primary_hand_path->points, center, s_hour_angle, settings.HourHandLength, width);
     gpath_draw_filled(ctx, s_primary_hand_path);
-    gpath_draw_outline_open(ctx, s_primary_hand_path);
   }
   
   // Move/update date
