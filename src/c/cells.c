@@ -192,10 +192,10 @@ GPoint cells_world_to_local_point(GPoint point) {
 }
 
 GRect cells_world_to_local_rect(GRect rect) {
-  int16_t center_offset = cells_pixels_per_cell / 2;
-  GPoint lower_right = GPoint(rect.origin.x + rect.size.w - center_offset - 1, rect.origin.y + rect.size.h - center_offset - 1);
+  rect.origin = gpoint_shift(rect.origin, cells_pixels_per_cell / 2, cells_pixels_per_cell / 2);
+  GPoint lower_right = GPoint(rect.origin.x + rect.size.w - cells_pixels_per_cell - 1, rect.origin.y + rect.size.h - cells_pixels_per_cell - 1);
   
-  GPoint local_upper_left = cells_world_to_local_point(gpoint_shift(rect.origin, center_offset, center_offset));
+  GPoint local_upper_left = cells_world_to_local_point(rect.origin);
   GPoint local_lower_right = cells_world_to_local_point(lower_right);
   
   return GRect(
