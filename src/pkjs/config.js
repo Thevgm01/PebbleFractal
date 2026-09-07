@@ -51,7 +51,7 @@ module.exports = [
     "messageKey": "Font",
     "defaultValue": 2,
     "label": "Date Font",
-    "description": "Bigger fonts may have display issues when the fractal covers a large portion of the screen",
+    "description": "Bigger fonts may have issues when the fractal covers a large portion of the screen",
     "options": [
       { "label": "Gothic 14",            "value": 0 },
       { "label": "Gothic 14 Bold",       "value": 1 },
@@ -63,6 +63,21 @@ module.exports = [
       { "label": "Gothic 28 Bold",       "value": 7 },
       { "label": "Roboto Condensed 21",  "value": 13 },
       { "label": "Leco 20 Bold",         "value": 16 },
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Legibility"
+      },
+      {
+        "type": "toggle",
+        "messageKey": "ShowGizmos",
+        "label": "Show Time Symbols",
+        "defaultValue": false
+      }
     ]
   },
   {

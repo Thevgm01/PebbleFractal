@@ -26,7 +26,8 @@
             "Font",
             "DebugGrid",
             "DebugSpeed",
-            "TertiaryColor"
+            "TertiaryColor",
+            "ShowGizmos"
         ],
         "projectType": "native",
         "resources": {

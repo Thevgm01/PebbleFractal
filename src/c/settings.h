@@ -9,6 +9,7 @@ typedef struct {
   GColor TertiaryColor;
   GColor BackgroundColor;
   bool ShowDate;
+  bool ShowGizmos;
   int16_t MinuteHandLength;
   int16_t HourHandLength;
   int16_t RecurseScale;
@@ -28,6 +29,7 @@ static void settings_restore_default() {
   settings.TertiaryColor = GColorDarkGray;
   settings.BackgroundColor = GColorBlack;
   settings.ShowDate = true;
+  settings.ShowGizmos = false;
   settings.MinuteHandLength = 40;
   settings.HourHandLength = 30;
   settings.RecurseScale = 85;
@@ -62,6 +64,7 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_COLOR(settings.TertiaryColor, MESSAGE_KEY_TertiaryColor);
   LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
   LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
+  LOAD_BOOL(settings.ShowGizmos, MESSAGE_KEY_ShowGizmos);
   LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
   LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
