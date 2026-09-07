@@ -192,7 +192,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Current time
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
-  bool midnight = (t->tm_hour == 0 && t->tm_min == 0 && t->tm_sec == 0);
+  bool is_midnight = (t->tm_hour == 0 && t->tm_min == 0 && t->tm_sec == 0);
   
   // Convert to angle
   #ifdef RANDOM
@@ -212,9 +212,18 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     }
   #endif
   
-  // Check if we need to move the date twice per minute, or on first load
-  s_mark_points = settings.ShowDate && (ctx == NULL || (!s_animation && (settings.DebugSpeed || t->tm_sec % 30 == 0)));
-  if (s_mark_points) cells_reset_grid(cells_grids.fractal);
+  // Change the date on first load or at midnight
+  bool change_date_text = settings.ShowDate && (ctx == NULL || is_midnight);
+  if (change_date_text) {
+    static char date_buf[16];
+    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+    text_layer_set_text(s_date_layer, date_buf);
+  }
+  
+  // Check if we need to move the date if we changed the text, or...
+  bool check_for_date_move = change_date_text ||
+    ((settings.DebugSpeed || t->tm_sec % 30 == 0) && // every frame with DebugSpeed, else twice per minute
+     settings.ShowDate && !s_animation); // (if not animating)
   
   // Draw fractal
   s_fractal_ctx = ctx;
@@ -222,9 +231,11 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_antialiased(ctx, false);
     graphics_context_set_stroke_width(ctx, 1);
   }
+  if (check_for_date_move) {
+    s_mark_points = true;
+    cells_reset_grid(cells_grids.fractal); 
+  }
   draw_hands_recursive(center, 0, settings.MinuteHandLength, 0);
-  
-  // Stop marking points
   s_mark_points = false;
 
   // Draw the primary hands
@@ -241,34 +252,28 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     gpath_draw_filled(ctx, s_primary_hand_path);
   }
   
-  // Move/update date
-  if (settings.ShowDate) {
-    // Write a new date at midnight, or on first load
-    bool should_change_text = ctx == NULL || midnight;
-    if (should_change_text) {
-      static char date_buf[16];
-      strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-      text_layer_set_text(s_date_layer, date_buf);
-    }
-    
-    // Move the date if we changed the text, if it's outside the screen boundaries, or if it's covered by the fractal
-    bool should_move = should_change_text || !s_date_inside_grid || cells_sensitive_overwritten();
-    if (should_move) {
-      move_date();
-    }
-    
-    // Debug drawing
-    if (ctx != NULL && settings.DebugGrid) {
-      if (!should_move)
-        cells_update_largest_rect();
-      
-      cells_debug_draw(ctx, s_date_inside_grid);
-      //cells_debug_print(cells_sensitive_grid);
-      
-      graphics_context_set_stroke_color(ctx, GColorCyan);
-      graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
-    }
-  }
+	// Move the date if we changed the text or...
+	bool should_move_date = change_date_text ||
+    (check_for_date_move && // we marked the grid and...
+      (!s_date_inside_grid || // it was previously out of bounds
+       cells_sensitive_overwritten())); // the fractal is covering it
+	if (should_move_date) {
+	  move_date();
+	}
+
+	// Debug grid drawing
+	if (ctx != NULL && settings.DebugGrid) {
+    // Even if we didn't move the date, we still want to update the visual for the largest rect
+	  if (!should_move_date)
+      cells_update_largest_rect();
+	  
+	  cells_debug_draw(ctx, s_date_inside_grid);
+	  //cells_debug_print(cells_sensitive_grid);
+	  
+    // Draw the bounds of the text layer in cyan
+	  graphics_context_set_stroke_color(ctx, GColorCyan);
+	  graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
+	}
 }
 
 static void notch_update_proc(Layer *layer, GContext *ctx) {
