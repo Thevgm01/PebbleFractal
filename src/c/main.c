@@ -23,6 +23,7 @@ static TextLayer *s_date_layer;
 static Animation *s_animation;
 static int8_t s_max_animation_depth;
 static int16_t s_length_mult_for_max_depth;
+static int8_t s_primary_hand_width;
 
 // Fractal drawing
 static int16_t s_hour_hand_scale;
@@ -239,16 +240,14 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   s_mark_points = false;
 
   // Draw the primary hands
-  if (ctx != NULL) {
+  if (ctx != NULL && s_primary_hand_width > 0) {
     graphics_context_set_antialiased(ctx, true);
     graphics_context_set_fill_color(ctx, settings.PrimaryColor);
     
-    int16_t width = 5;
-
-    graphics_fill_circle(ctx, center, width - 2);
-    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_minute_angle, settings.MinuteHandLength, width);
+    graphics_fill_circle(ctx, center, s_primary_hand_width - 2);
+    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_minute_angle, settings.MinuteHandLength, s_primary_hand_width);
     gpath_draw_filled(ctx, s_primary_hand_path);
-    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_hour_angle, settings.HourHandLength, width);
+    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_hour_angle, settings.HourHandLength, s_primary_hand_width);
     gpath_draw_filled(ctx, s_primary_hand_path);
   }
   
@@ -361,7 +360,8 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
   s_max_animation_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
   s_length_mult_for_max_depth = progress - (s_max_animation_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d)", s_max_animation_depth, s_length_mult_for_max_depth);
+  s_primary_hand_width = min(5, progress * 10 / ANIMATION_NORMALIZED_MAX);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d\%)", s_max_animation_depth, s_length_mult_for_max_depth * MAX_RECURSION_DEPTH * 100 / ANIMATION_NORMALIZED_MAX);
   layer_mark_dirty(s_fractal_layer);
 }
 
