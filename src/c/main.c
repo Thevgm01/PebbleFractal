@@ -157,41 +157,28 @@ static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t ang
   points[3] = gpoint_shift(center, side_offset.x, side_offset.y);
 }
 
-static void move_date(tm* t, GContext *ctx, int16_t attempt) {
-  // Write the new date text
-  static char date_buf[16];
-  strftime(date_buf, sizeof(date_buf), attempt == 0 ? "%a %b %d" : attempt == 1 ? "%a\n%b %d" : "%a\n%b\n%d", t);
-  text_layer_set_text(s_date_layer, date_buf);
-  
-  // Calculate layer size
-  s_date_rect.size = text_layer_get_content_size(s_date_layer);
-  cells_set_preferred_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
-  
+static void move_date() {  
   // Calculate the largest rect
   cells_update_largest_rect();
+  GRect largest_rect = cells_local_to_world_rect(cells_largest_rect);
   
-  // Center the date in the rect
-  s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
-  //APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
+  // Set the text layer's width so it can calculate line wrapping
+  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(0, 0, largest_rect.size.w, 200));
+  
+  // Set the date rect's width/height, and center it in the largest rect
+  s_date_rect.size = text_layer_get_content_size(s_date_layer);
+  s_date_rect.origin = center_in_rect(s_date_rect.size, largest_rect);
+  
+  // Now use that information to set the text layer's frame for real
+  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
+    s_date_rect.origin.x, 
+    s_date_rect.origin.y - 4, 
+    s_date_rect.size.w, 
+    200));
   
   // Mark the new sensitive bits
   cells_reset_grid(cells_grids.sensitive);
   s_date_inside_grid = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
-  
-  // If the date is still being covered, try again with different formatting (up to three times)
-  if (attempt < 2 && (!s_date_inside_grid || cells_sensitive_overwritten())) {
-    move_date(t, ctx, attempt + 1);
-    return;
-  }
-  
-  // Now we actually move the REAL date layer
-  // Note: the text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
-  // Probably needs to be adjusted on a per-font-basis
-  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
-    s_date_rect.origin.x - 100 + s_date_rect.size.w / 2, 
-    s_date_rect.origin.y - 4, 
-    200, 
-    200));
 }
 
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
@@ -256,10 +243,18 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Move/update date
   if (settings.ShowDate) {
-    bool should_move = ctx == NULL || midnight || !s_date_inside_grid || cells_sensitive_overwritten();
+    // Write a new date at midnight, or on first load
+    bool should_change_text = ctx == NULL || midnight;
+    if (should_change_text) {
+      static char date_buf[16];
+      strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
+      text_layer_set_text(s_date_layer, date_buf);
+    }
     
+    // Move the date if we changed the text, if it's outside the screen boundaries, or if it's covered by the fractal
+    bool should_move = should_change_text || !s_date_inside_grid || cells_sensitive_overwritten();
     if (should_move) {
-      move_date(t, ctx, 0);
+      move_date();
     }
     
     // Debug drawing
@@ -465,6 +460,7 @@ static void window_load(Window *window) {
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  text_layer_set_overflow_mode(s_date_layer, GTextOverflowModeWordWrap);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Initialize the occupied screen cell tracker

@@ -7,7 +7,6 @@ GRect cells_largest_rect;
 int16_t cells_pixels_per_cell;
 
 GRect screen_region;
-GSize min_size;
 
 static int16_t histogram_stack[BITS];
 static int16_t histogram_stack_count = 0;
@@ -182,10 +181,6 @@ bool cells_sensitive_overwritten() {
   return false;
 }
 
-void cells_set_preferred_size(GSize size) {
-  min_size = size;
-}
-
 GPoint cells_world_to_local_point(GPoint point) {
   return GPoint(
     (point.x - screen_region.origin.x) * BITS / screen_region.size.w,
@@ -268,13 +263,8 @@ void cells_debug_print(grid_t grid[]) {
 // --- Largest rect caclulation --- //
 
 static int16_t gsize_score(GSize size) {
-  // Must have some area
-  if (size.w == 0 || size.h == 0) return 0;
-  // Rapidly gain score as we meet the minimum desired dimensions, but not if we exceed
-  int16_t w_score = min(size.w * 10000 / min_size.w, 10000);
-  int16_t h_score = min(size.h * 10000 / min_size.h, 10000);
   // 5 is a magic number, basically ends up preferring wider rects even if they have the same area as tall rects
-  return size.w * (size.h + 5) + w_score + h_score;
+  return (size.w - 5) * size.h;
 }
 
 static void check_next_rect(int16_t histogram[], int16_t index, int16_t y, GRect *result, int16_t *result_score) {

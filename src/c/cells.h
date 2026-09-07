@@ -29,7 +29,6 @@ void cells_mark_point(grid_t grid[], GPoint world_pos);
 void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destination);
 bool cells_mark_rect(grid_t grid[], GRect world_rect);
 bool cells_sensitive_overwritten();
-void cells_set_preferred_size(GSize size);
 
 GPoint cells_world_to_local_point(GPoint point);
 GRect cells_world_to_local_rect(GRect rect);
