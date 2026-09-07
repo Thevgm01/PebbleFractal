@@ -5,7 +5,6 @@
 CellsGrids cells_grids;
 GRect cells_largest_rect;
 int16_t cells_pixels_per_cell;
-bool cells_sensitive_force;
 
 GRect screen_region;
 GSize min_size;
@@ -146,42 +145,44 @@ void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destintati
 
 // Return true if the rect was fully bounds
 bool cells_mark_rect(grid_t grid[], GRect world_rect) {
-  
   GRect local_rect = cells_world_to_local_rect(world_rect);
-  GRect original_local_rect = local_rect;
+  GRect original_local_rect = local_rect; // Save a copy of the original so we can check for OOB
   
-  // If we're over the left edge, shrink size and shift to origin
+  // If we're over the left/upper edge, shrink size and shift to origin
   if (local_rect.origin.x < 0) {
     local_rect.size.w += local_rect.origin.x;
     local_rect.origin.x = 0;
   }
+  if (local_rect.origin.y < 0) {
+    local_rect.size.h += local_rect.origin.y;
+    local_rect.origin.y = 0;
+  }
   
-  // If we're over the right edge, shrink size
-  local_rect.size.w = min(BITS, local_rect.size.w + 1);
+  // If we're over the right/bottom edge, shrink size
+  local_rect.size.w = min(BITS - 1 - local_rect.origin.x, local_rect.size.w);
+  local_rect.size.h = min(BITS - 1 - local_rect.origin.y, local_rect.size.h);
   
   // Form a row of the rect in bits
-  grid_t row = local_rect.size.w >= BITS ? ~0 : ((1 << local_rect.size.w) - 1) << local_rect.origin.x;
+  grid_t row = local_rect.size.w >= BITS ? ~0 : ((1 << (local_rect.size.w + 1)) - 1) << local_rect.origin.x;
   
   // Fill out the rows
-  int16_t start_y = max(local_rect.origin.y, 0);
-  int16_t end_y = min(local_rect.origin.y + local_rect.size.h, BITS - 1);
-  for (int16_t y = start_y; y <= end_y; y++) {
+  for (int16_t y = local_rect.origin.y; y <= local_rect.origin.y + local_rect.size.h; y++) {
     grid[y] |= row;
   }
   
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Original: ", original_local_rect);
+  APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Local: ", local_rect);
   return grect_equal(&local_rect, &original_local_rect);
 }
 
 bool cells_sensitive_overwritten() {
-  if (cells_sensitive_force)
-    return true; // If the sensitive cells were outside the bounds, always consider them overwritten
   for (int16_t y = 0; y < BITS; y++)
     if ((cells_grids.base[y] | cells_grids.fractal[y] | cells_grids.screen[y]) & cells_grids.sensitive[y])
       return true;
   return false;
 }
 
-void cells_set_min_size(GSize size) {
+void cells_set_preferred_size(GSize size) {
   min_size = size;
 }
 
@@ -214,7 +215,7 @@ GRect cells_local_to_world_rect(GRect rect) {
 
 // --- Drawing --- //
 
-void cells_debug_draw(GContext *ctx) {  
+void cells_debug_draw(GContext *ctx, bool sensitive_alternate_color) {  
   // Draw a pixel in the center of each cell
   for (int y = 0; y < BITS; y++) {
     for (int x = 0; x < BITS; x++) {
@@ -223,7 +224,7 @@ void cells_debug_draw(GContext *ctx) {
         cells_grids.screen[y] & x_bit ? GColorYellow
         : cells_grids.base[y] & x_bit ? GColorBlue 
         : cells_grids.fractal[y] & x_bit ? GColorPurple
-        : cells_grids.sensitive[y] & x_bit ? GColorRed
+        : cells_grids.sensitive[y] & x_bit ? (sensitive_alternate_color ? GColorRed : GColorYellow )
         : GColorGreen); // Empty
       bool is_cross = (cells_grids.screen[y] | cells_grids.fractal[y] | cells_grids.sensitive[y]) & x_bit;
       
@@ -270,8 +271,8 @@ static int16_t gsize_score(GSize size) {
   // Must have some area
   if (size.w == 0 || size.h == 0) return 0;
   // Rapidly gain score as we meet the minimum desired dimensions, but not if we exceed
-  int16_t w_score = min(size.w * 1000 / min_size.w, 1000);
-  int16_t h_score = min(size.h * 1000 / min_size.h, 1000);
+  int16_t w_score = min(size.w * 10000 / min_size.w, 10000);
+  int16_t h_score = min(size.h * 10000 / min_size.h, 10000);
   // 5 is a magic number, basically ends up preferring wider rects even if they have the same area as tall rects
   return size.w * (size.h + 5) + w_score + h_score;
 }

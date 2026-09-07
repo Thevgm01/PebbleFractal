@@ -21,7 +21,6 @@ typedef struct {
 extern int16_t cells_pixels_per_cell;
 extern GRect cells_largest_rect;
 extern CellsGrids cells_grids;
-extern bool cells_sensitive_force;
 
 void cells_init(GPoint center, int16_t diameter, int16_t inset);
 
@@ -30,13 +29,13 @@ void cells_mark_point(grid_t grid[], GPoint world_pos);
 void cells_mark_line(grid_t grid[], GPoint world_origin, GPoint world_destination);
 bool cells_mark_rect(grid_t grid[], GRect world_rect);
 bool cells_sensitive_overwritten();
+void cells_set_preferred_size(GSize size);
 
-void cells_set_min_size(GSize size);
 GPoint cells_world_to_local_point(GPoint point);
 GRect cells_world_to_local_rect(GRect rect);
 GRect cells_local_to_world_rect(GRect rect);
 
 void cells_update_largest_rect(); // https://www.geeksforgeeks.org/dsa/maximum-size-rectangle-binary-sub-matrix-1s/
 
-void cells_debug_draw(GContext *ctx);
+void cells_debug_draw(GContext *ctx, bool sensitive_alternate_color);
 void cells_debug_print(grid_t grid[]);

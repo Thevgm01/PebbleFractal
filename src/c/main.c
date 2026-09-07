@@ -31,6 +31,7 @@ static uint16_t s_minute_angle;
 static GContext *s_fractal_ctx;
 static bool s_mark_points;
 static GRect s_date_rect;
+static bool s_date_inside_grid;
 
 static GPath *s_primary_hand_path = NULL;
 static const GPathInfo PRIMARY_HAND_PATH_INFO = {
@@ -156,50 +157,41 @@ static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t ang
   points[3] = gpoint_shift(center, side_offset.x, side_offset.y);
 }
 
-static void move_date(tm* t, GContext *ctx) {
-  // Change the text every minute, or on first load
-  bool update_date = ctx == NULL || (!s_animation && t->tm_sec == 0);
-  if (update_date) {
-    static char date_buf[16];
-    strftime(date_buf, sizeof(date_buf), "%a %b %d", t);
-    text_layer_set_text(s_date_layer, date_buf);
-    s_date_rect.size = text_layer_get_content_size(s_date_layer);
-    cells_set_min_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
+static void move_date(tm* t, GContext *ctx, int16_t attempt) {
+  // Write the new date text
+  static char date_buf[16];
+  strftime(date_buf, sizeof(date_buf), attempt == 0 ? "%a %b %d" : attempt == 1 ? "%a\n%b %d" : "%a\n%b\n%d", t);
+  text_layer_set_text(s_date_layer, date_buf);
+  
+  // Calculate layer size
+  s_date_rect.size = text_layer_get_content_size(s_date_layer);
+  cells_set_preferred_size(cells_world_to_local_rect(grect_crop(s_date_rect, DATE_CROP)).size);
+  
+  // Calculate the largest rect
+  cells_update_largest_rect();
+  
+  // Center the date in the rect
+  s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
+  //APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
+  
+  // Mark the new sensitive bits
+  cells_reset_grid(cells_grids.sensitive);
+  s_date_inside_grid = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
+  
+  // If the date is still being covered, try again with different formatting (up to three times)
+  if (attempt < 2 && (!s_date_inside_grid || cells_sensitive_overwritten())) {
+    move_date(t, ctx, attempt + 1);
+    return;
   }
-
-  // Move the date if the fractal passed over it, or on first load
-  bool move_date = ctx == NULL || cells_sensitive_overwritten();
-  if (move_date) {
-
-    // Calculate the largest rect (expensive!)
-    cells_update_largest_rect();
-
-    s_date_rect.origin = center_in_rect(s_date_rect.size, cells_local_to_world_rect(cells_largest_rect));
-
-    // The text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
-    // Probably needs to be adjusted on a per-font-basis
-    layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
-      s_date_rect.origin.x, 
-      s_date_rect.origin.y - 4, 
-      200, 
-      30));
-
-    APP_LOG_GRECT(APP_LOG_LEVEL_DEBUG, "Date overwritten: ", s_date_rect);
-
-    cells_reset_grid(cells_grids.sensitive);
-    cells_sensitive_force = cells_mark_rect(cells_grids.sensitive, grect_crop(s_date_rect, DATE_CROP));
-    //cells_debug_print(cells_sensitive_grid);
-  }
-
-  if (ctx != NULL && settings.DebugGrid) {
-    if (!move_date)
-      cells_update_largest_rect();
-
-    cells_debug_draw(ctx);
-
-    graphics_context_set_stroke_color(ctx, GColorCyan);
-    graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
-  }
+  
+  // Now we actually move the REAL date layer
+  // Note: the text seems to appear at the bottom of the reported rect, so manually shift the layer up a bit
+  // Probably needs to be adjusted on a per-font-basis
+  layer_set_frame(text_layer_get_layer(s_date_layer), GRect(
+    s_date_rect.origin.x - 100 + s_date_rect.size.w / 2, 
+    s_date_rect.origin.y - 4, 
+    200, 
+    200));
 }
 
 static void fractal_update_proc(Layer *layer, GContext *ctx) {
@@ -213,13 +205,13 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   // Current time
   time_t now = time(NULL);
   struct tm* t = localtime(&now);
+  bool midnight = (t->tm_hour == 0 && t->tm_min == 0 && t->tm_sec == 0);
   
   // Convert to angle
   #ifdef RANDOM
     srand(now);
     s_hour_angle = rand() % TRIG_MAX_ANGLE;
     s_minute_angle = rand() % TRIG_MAX_ANGLE;
-    move_date = true;
   #elif defined(SCREENSHOTMODE)
     s_hour_angle = TRIG_MAX_ANGLE * 1 / 4;
     s_minute_angle = TRIG_MAX_ANGLE * s_screenshot_frame / 60;
@@ -264,7 +256,23 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   
   // Move/update date
   if (settings.ShowDate) {
-    move_date(t, ctx);
+    bool should_move = ctx == NULL || midnight || !s_date_inside_grid || cells_sensitive_overwritten();
+    
+    if (should_move) {
+      move_date(t, ctx, 0);
+    }
+    
+    // Debug drawing
+    if (ctx != NULL && settings.DebugGrid) {
+      if (!should_move)
+        cells_update_largest_rect();
+      
+      cells_debug_draw(ctx, s_date_inside_grid);
+      //cells_debug_print(cells_sensitive_grid);
+      
+      graphics_context_set_stroke_color(ctx, GColorCyan);
+      graphics_draw_rect(ctx, grect_crop(s_date_rect, DATE_CROP));
+    }
   }
 }
 
@@ -450,9 +458,10 @@ static void window_load(Window *window) {
   layer_add_child(root, s_notch_layer);
   
   // Text layer
-  GRect date_rect = GRect(0, 0, 200, 30);
+  GRect date_rect = GRect(0, 0, 200, 200);
   s_date_layer = text_layer_create(date_rect);
   text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
   
   // Initialize the occupied screen cell tracker
