@@ -95,9 +95,6 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   if (s_fractal_ctx == NULL)
     return;
   
-  // Determine line width (can be zero, which will draw a 1-pixel line)
-  int16_t half_width = (MAX_RECURSION_DEPTH - depth + 1) * settings.WidthScale / 100;
-  
   // Set the colors based on the line length
   if (length > settings.MinuteHandLength / 2)
     // Make the hands white for the uppermost layer
@@ -107,43 +104,13 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   else
     graphics_context_set_stroke_color(s_fractal_ctx, settings.TertiaryColor);
   
-  #ifdef CIRCLES // Draw circles
-    if (half_width > 1) {
-      graphics_draw_circle(s_fractal_ctx, minute_point, half_width);
-      graphics_draw_circle(s_fractal_ctx, hour_point, half_width);
-    } else { // Circles too small, draw a point
-      graphics_draw_pixel(s_fractal_ctx, minute_point);
-      graphics_draw_pixel(s_fractal_ctx, hour_point);
-    }
-  #else // Draw lines
-    if (half_width <= 1) { // Hands are thin, draw them as individual lines
-      if (length > 1) {
-        graphics_draw_line(s_fractal_ctx, origin, minute_point);
-        graphics_draw_line(s_fractal_ctx, origin, hour_point);
-      } else { // Line's too short, draw a point
-        graphics_draw_pixel(s_fractal_ctx, minute_point);
-        graphics_draw_pixel(s_fractal_ctx, hour_point);
-      }
-    } else { // Hands are thick, draw two lines on either side
-      int16_t next_half_width = half_width - 1;
-      int16_t minute_normal_angle = add_angles2(new_minute_angle, TRIG_MAX_ANGLE / 4);
-      int16_t hour_normal_angle = add_angles2(new_hour_angle, TRIG_MAX_ANGLE / 4);
-
-      // Draw the sides of the clock hands
-      graphics_draw_line(s_fractal_ctx, // Left minute line
-                         point_on_circle(origin, minute_normal_angle, half_width), 
-                         point_on_circle(minute_point, minute_normal_angle, next_half_width));
-      graphics_draw_line(s_fractal_ctx, // Right minute line
-                         point_on_circle(origin, minute_normal_angle, -half_width), 
-                         point_on_circle(minute_point, minute_normal_angle, -next_half_width));
-      graphics_draw_line(s_fractal_ctx, // Left hour line
-                         point_on_circle(origin, hour_normal_angle, half_width), 
-                         point_on_circle(hour_point, hour_normal_angle, next_half_width));
-      graphics_draw_line(s_fractal_ctx, // Right hour line
-                         point_on_circle(origin, hour_normal_angle, -half_width), 
-                         point_on_circle(hour_point, hour_normal_angle, -next_half_width));
-    }
-  #endif
+  if (length > 1) {
+    graphics_draw_line(s_fractal_ctx, origin, minute_point);
+    graphics_draw_line(s_fractal_ctx, origin, hour_point);
+  } else { // Line's too short, draw a point
+    graphics_draw_pixel(s_fractal_ctx, minute_point);
+    graphics_draw_pixel(s_fractal_ctx, hour_point);
+  }
 }
 
 static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t angle, int16_t length, int16_t width) {

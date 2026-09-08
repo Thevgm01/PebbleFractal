@@ -21,8 +21,6 @@
             "MinuteHandLength",
             "HourHandLength",
             "RecurseScale",
-            "WidthScale",
-            "FirstHandScale",
             "Font",
             "DebugGrid",
             "DebugSpeed",

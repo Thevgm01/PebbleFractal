@@ -13,8 +13,6 @@ typedef struct {
   int16_t MinuteHandLength;
   int16_t HourHandLength;
   int16_t RecurseScale;
-  int16_t WidthScale;
-  int16_t FirstHandScale;
   int16_t Font;
   bool DebugGrid;
   bool DebugSpeed;
@@ -33,8 +31,6 @@ static void settings_restore_default() {
   settings.MinuteHandLength = 40;
   settings.HourHandLength = 30;
   settings.RecurseScale = 85;
-  settings.WidthScale = 0;
-  settings.FirstHandScale = 1;
   settings.Font = 18;
   settings.DebugGrid = false;
   settings.DebugSpeed = false;
@@ -68,8 +64,6 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
   LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
-  LOAD_INT(settings.WidthScale, MESSAGE_KEY_WidthScale);
-  LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
   LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
   LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
   

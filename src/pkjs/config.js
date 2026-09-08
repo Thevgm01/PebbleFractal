@@ -12,6 +12,40 @@ module.exports = [
     "items": [
       {
         "type": "heading",
+        "defaultValue": "Date"
+      },
+      {
+        "type": "toggle",
+        "messageKey": "ShowDate",
+        "label": "Show Date",
+        "defaultValue": true
+      },
+      {
+        "type": "select",
+        "messageKey": "Font",
+        "defaultValue": 2,
+        "label": "Date Font",
+        "description": "Bigger fonts may have positioning issues when the fractal covers a large portion of the screen",
+        "options": [
+          { "label": "Gothic 14",            "value": 0 },
+          { "label": "Gothic 14 Bold",       "value": 1 },
+          { "label": "Gothic 18",            "value": 2 },
+          { "label": "Gothic 18 Bold",       "value": 3 },
+          { "label": "Gothic 24",            "value": 4 },
+          { "label": "Gothic 24 Bold",       "value": 5 },
+          { "label": "Gothic 28",            "value": 6 },
+          { "label": "Gothic 28 Bold",       "value": 7 },
+          { "label": "Roboto Condensed 21",  "value": 13 },
+          { "label": "Leco 20 Bold",         "value": 16 },
+        ]
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
         "defaultValue": "Colors"
       },
       {
@@ -41,51 +75,11 @@ module.exports = [
     ]
   },
   {
-    "type": "toggle",
-    "messageKey": "ShowDate",
-    "label": "Show Date",
-    "defaultValue": true
-  },
-  {
-    "type": "select",
-    "messageKey": "Font",
-    "defaultValue": 2,
-    "label": "Date Font",
-    "description": "Bigger fonts may have issues when the fractal covers a large portion of the screen",
-    "options": [
-      { "label": "Gothic 14",            "value": 0 },
-      { "label": "Gothic 14 Bold",       "value": 1 },
-      { "label": "Gothic 18",            "value": 2 },
-      { "label": "Gothic 18 Bold",       "value": 3 },
-      { "label": "Gothic 24",            "value": 4 },
-      { "label": "Gothic 24 Bold",       "value": 5 },
-      { "label": "Gothic 28",            "value": 6 },
-      { "label": "Gothic 28 Bold",       "value": 7 },
-      { "label": "Roboto Condensed 21",  "value": 13 },
-      { "label": "Leco 20 Bold",         "value": 16 },
-    ]
-  },
-  {
     "type": "section",
     "items": [
       {
         "type": "heading",
-        "defaultValue": "Legibility"
-      },
-      {
-        "type": "toggle",
-        "messageKey": "ShowGizmos",
-        "label": "Show Time Symbols",
-        "defaultValue": false
-      }
-    ]
-  },
-  {
-    "type": "section",
-    "items": [
-      {
-        "type": "heading",
-        "defaultValue": "Sizes"
+        "defaultValue": "Sizing"
       },
       {
         "type": "slider",
@@ -114,26 +108,21 @@ module.exports = [
         "min": 0.5,
         "max": 1,
         "step": 0.01
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Legibility"
       },
       {
-        "type": "slider",
-        "messageKey": "FirstHandScale",
-        "label": "Top Hand Scale",
-        "defaultValue": 1,
-        "description": "Lengthen the topmost hands to help with legibility (does not affect the fractal)",
-        "min": 1,
-        "max": 3,
-        "step": 0.25
-      },
-      {
-        "type": "slider",
-        "messageKey": "WidthScale",
-        "label": "Width Scale",
-        "defaultValue": 0,
-        "description": "Experimental - Make the hands appear \"thicker\" towards the top",
-        "min": 0,
-        "max": 0.5,
-        "step": 0.05
+        "type": "toggle",
+        "messageKey": "ShowGizmos",
+        "label": "Show Minute/Hour Symbols",
+        "defaultValue": false
       }
     ]
   },
