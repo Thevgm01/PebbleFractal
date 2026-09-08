@@ -17,10 +17,12 @@ static int16_t squircle_offset_from_angle(int32_t angle) {
   // Angle goes from 0-TRIG_MAX_ANGLE
   // Since the offset is radially symmetrical, only worry about the angle from 0° to 90°
   angle = angle % (TRIG_MAX_ANGLE / 4);
+  // If the angle is exactly a right angle, just return 0
+  if (angle == 0) return 0;
   // Mirror result if between 45° and 90°
   if (angle > TRIG_MAX_ANGLE / 8) angle = TRIG_MAX_ANGLE / 4 - angle;
   // Calculate offset with some magic numbers
-  return angle * angle / 3000000;
+  return angle * angle / 3000000 + 1;
 }
 
 // --- Logging --- //
