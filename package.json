@@ -27,7 +27,9 @@
             "TertiaryColor",
             "ShowGizmos",
             "PrimaryHandWidth",
-            "HourMarkers"
+            "HourMarkers",
+            "NotchInset",
+            "NotchSquircle"
         ],
         "projectType": "native",
         "resources": {

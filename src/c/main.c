@@ -279,7 +279,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
   GSize size = bounds.size;
-  int16_t radius = min(size.w, size.h) / 2 - 10;
+  int16_t radius = max(min(size.w, size.h) / 2 - settings.NotchInset, 10);
   
   graphics_context_set_antialiased(ctx, true);
   graphics_context_set_stroke_width(ctx, 3);
@@ -289,7 +289,7 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
   // Tick marks
   for (int8_t i = 0; i < 15; i++) {
     int16_t angle = i * TRIG_MAX_ANGLE / 60;
-    int16_t notch_radius = radius + PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(angle));
+    int16_t notch_radius = radius + (settings.NotchSquircle ? squircle_offset_from_angle(angle) : 0);
     bool is_hour = (i % 5 == 0);
 
     int32_t cos = cos_lookup(angle);

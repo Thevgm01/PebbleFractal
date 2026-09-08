@@ -10,10 +10,12 @@ typedef struct {
   GColor BackgroundColor;
   bool ShowDate;
   bool ShowGizmos;
+  bool NotchSquircle;
   int16_t MinuteHandLength;
   int16_t HourHandLength;
   int16_t RecurseScale;
   int8_t Font;
+  int8_t NotchInset;
   int8_t PrimaryHandWidth;
   int8_t HourMarkers;
   bool DebugGrid;
@@ -30,11 +32,13 @@ static void settings_restore_default() {
   settings.BackgroundColor = GColorBlack;
   settings.ShowDate = true;
   settings.ShowGizmos = false;
+  settings.NotchSquircle = true;
   settings.MinuteHandLength = 40;
   settings.HourHandLength = 30;
   settings.RecurseScale = 85;
   settings.Font = 18;
   settings.HourMarkers = 0;
+  settings.NotchInset = 10;
   settings.PrimaryHandWidth = 5;
   settings.DebugGrid = false;
   settings.DebugSpeed = false;
@@ -66,9 +70,11 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_COLOR(settings.BackgroundColor, MESSAGE_KEY_BackgroundColor);
   LOAD_BOOL(settings.ShowDate, MESSAGE_KEY_ShowDate);
   LOAD_BOOL(settings.ShowGizmos, MESSAGE_KEY_ShowGizmos);
+  LOAD_BOOL(settings.NotchSquircle, MESSAGE_KEY_NotchSquircle);
   LOAD_INT(settings.MinuteHandLength, MESSAGE_KEY_MinuteHandLength);
   LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
+  LOAD_INT(settings.NotchInset, MESSAGE_KEY_NotchInset);
   LOAD_INT(settings.PrimaryHandWidth, MESSAGE_KEY_PrimaryHandWidth);
   LOAD_SELECT(settings.Font, MESSAGE_KEY_Font);
   LOAD_SELECT(settings.HourMarkers, MESSAGE_KEY_HourMarkers);
@@ -88,6 +94,11 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   // Perhaps a better solution would swap the recursion multiplication order if the sizes are inverted
   // Then again, what twisted soul is going to make the hour hand longer than the minute hand?
   settings.HourHandLength = min(settings.MinuteHandLength, settings.HourHandLength);
+  
+  // Making the notches have a squircle shape only works on rectangular watches
+  #ifdef PBL_ROUND
+  settings.NotchSquircle = false;
+  #endif
 
   settings_save();
   

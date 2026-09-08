@@ -1,6 +1,7 @@
 #include <pebble.h>
 #include "cells.h"
 #include "utility.h"
+#include "settings.h"
 
 CellsGrids cells_grids;
 GRect cells_largest_rect;
@@ -26,18 +27,19 @@ void cells_init(GPoint center, int16_t diameter, int16_t inset) {
     for (int16_t x = 0; x < BITS / 2; x++) {
       const GPoint centered = GPoint(x * 2 + 1 - BITS, y * 2 + 1 - BITS);
       int16_t sqr_distance = centered.x * centered.x + centered.y * centered.y;
-      #ifdef PBL_ROUND
+      if (settings.NotchSquircle) {
         if (sqr_distance > BITS * BITS) {
           row |= (1 << x) | (1 << (BITS - 1 - x));
         }
-      #else
+      }
+      else {
         int32_t angle = atan2_lookup(centered.y, centered.x);
         int16_t offset = squircle_offset_from_angle(angle) * 2; // Double because the centered coordinates are halved
         if (sqr_distance * screen_region.size.h * screen_region.size.w / (BITS * BITS) > // Remap the sqr_distance into pixel space
             (screen_region.size.w + offset) * (screen_region.size.h + offset)) { // Calculate the squircle edge distance
           row |= (1 << x) | (1 << (BITS - 1 - x));
         }
-      #endif
+      }
     }
     // Mirror vertically
     cells_grids.base[y] = row;

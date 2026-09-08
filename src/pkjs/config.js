@@ -108,7 +108,17 @@ module.exports = [
         "min": 0.5,
         "max": 1,
         "step": 0.01
-      }
+      },
+      {
+        "type": "slider",
+        "messageKey": "PrimaryHandWidth",
+        "label": "Primary Hand Width",
+        "defaultValue": 5,
+        "description": "Visual only, doesn't affect the fractal",
+        "min": 1,
+        "max": 10,
+        "step": 1
+      },
     ]
   },
   {
@@ -116,15 +126,15 @@ module.exports = [
     "items": [
       {
         "type": "heading",
-        "defaultValue": "Legibility"
+        "defaultValue": "Notch Markers"
       },
       {
         "type": "slider",
-        "messageKey": "PrimaryHandWidth",
-        "label": "Primary Hand Width",
-        "defaultValue": 5,
-        "min": 1,
-        "max": 10,
+        "messageKey": "NotchInset",
+        "label": "Inset",
+        "defaultValue": 10,
+        "min": 0,
+        "max": 30,
         "step": 1
       },
       {
@@ -137,6 +147,13 @@ module.exports = [
           { "label": "Circle",  "value": 1 },
           { "label": "Diamond", "value": 2 }
         ]
+      },
+      {
+        "type": "toggle",
+        "messageKey": "NotchSquircle",
+        "label": "Squircleify",
+        "defaultValue": true,
+        "description": "Only works on square watches"
       },
       {
         "type": "toggle",
