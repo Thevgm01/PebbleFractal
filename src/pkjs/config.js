@@ -128,6 +128,17 @@ module.exports = [
         "step": 1
       },
       {
+        "type": "select",
+        "messageKey": "HourMarkers",
+        "defaultValue": 0,
+        "label": "Hour Notch Style",
+        "options": [
+          { "label": "Line",    "value": 0 },
+          { "label": "Circle",  "value": 1 },
+          { "label": "Diamond", "value": 2 }
+        ]
+      },
+      {
         "type": "toggle",
         "messageKey": "ShowGizmos",
         "label": "Show Minute/Hour Symbols",

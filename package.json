@@ -26,7 +26,8 @@
             "DebugSpeed",
             "TertiaryColor",
             "ShowGizmos",
-            "PrimaryHandWidth"
+            "PrimaryHandWidth",
+            "HourMarkers"
         ],
         "projectType": "native",
         "resources": {

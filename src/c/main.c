@@ -40,6 +40,12 @@ static const GPathInfo PRIMARY_HAND_PATH_INFO = {
   .points = (GPoint[4]) {{0, 0}, {0, 0}, {0, 0}, {0, 0}}
 };
 
+static GPath *s_notch_diamond_path = NULL;
+static const GPathInfo NOTCH_DIAMOND_PATH_INFO = {
+  .num_points = 4,
+  .points = (GPoint[4]) {{0, 8}, {4, 0}, {0, -8}, {-4, 0}}
+};
+
 // Screenshot mode
 static int16_t s_screenshot_frame = 0;
 
@@ -242,44 +248,73 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
 	}
 }
 
+static void quad_circle(GContext *ctx, GPoint center, int16_t x, int16_t y, int16_t radius) {
+  graphics_fill_circle(ctx, gpoint_shift(center, x, y), radius);
+  graphics_fill_circle(ctx, gpoint_shift(center, -y, x), radius);
+  graphics_fill_circle(ctx, gpoint_shift(center, -x, -y), radius);
+  graphics_fill_circle(ctx, gpoint_shift(center, y, -x), radius);
+}
+
+static void quad_line(GContext *ctx, GPoint center, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+  graphics_draw_line(ctx, gpoint_shift(center, x1, y1), gpoint_shift(center, x2, y2));
+  graphics_draw_line(ctx, gpoint_shift(center, -y1, x1), gpoint_shift(center, -y2, x2));
+  graphics_draw_line(ctx, gpoint_shift(center, -x1, -y1), gpoint_shift(center, -x2, -y2));
+  graphics_draw_line(ctx, gpoint_shift(center, y1, -x1), gpoint_shift(center, y2, -x2));
+}
+
+static void quad_gpath(GContext *ctx, GPath *path, GPoint center, int32_t angle, int16_t radius) {
+  gpath_rotate_to(path, angle);
+  gpath_move_to(path, point_on_circle(center, angle, radius));
+  gpath_draw_filled(ctx, path);
+  gpath_move_to(path, point_on_circle(center, add_angles2(angle, TRIG_MAX_ANGLE / 2), radius));
+  gpath_draw_filled(ctx, path);
+  gpath_rotate_to(path, add_angles2(angle, TRIG_MAX_ANGLE / 4));
+  gpath_move_to(path, point_on_circle(center, add_angles2(angle, TRIG_MAX_ANGLE / 4), radius));
+  gpath_draw_filled(ctx, path);
+  gpath_move_to(path, point_on_circle(center, add_angles2(angle, TRIG_MAX_ANGLE * 3 / 4), radius));
+  gpath_draw_filled(ctx, path);
+}
+
 static void notch_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
   GSize size = bounds.size;
+  int16_t radius = min(size.w, size.h) / 2 - 10;
   
   graphics_context_set_antialiased(ctx, true);
+  graphics_context_set_stroke_width(ctx, 3);
+  graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
+  graphics_context_set_fill_color(ctx, settings.PrimaryColor);
   
-  int16_t radius = min(size.w, size.h) / 2 - 8;
-    
   // Tick marks
   for (int8_t i = 0; i < 15; i++) {
     int16_t angle = i * TRIG_MAX_ANGLE / 60;
+    int16_t notch_radius = radius + PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(angle));
     bool is_hour = (i % 5 == 0);
-    int16_t outer_r = radius + PBL_IF_ROUND_ELSE(0, squircle_offset_from_angle(angle));
-    
+
     int32_t cos = cos_lookup(angle);
     int32_t sin = sin_lookup(angle);
-    int16_t x1 = cos * outer_r / TRIG_MAX_RATIO;
-    int16_t y1 = sin * outer_r / TRIG_MAX_RATIO;
+    int16_t x = cos * notch_radius / TRIG_MAX_RATIO;
+    int16_t y = sin * notch_radius / TRIG_MAX_RATIO;
     
-    //graphics_context_set_stroke_color(ctx, is_hour ? settings.PrimaryColor : settings.SecondaryColor);
-    if (is_hour) {
-      int16_t inner_r = outer_r - 8;
-      int16_t x2 = cos * inner_r / TRIG_MAX_RATIO;
-      int16_t y2 = sin * inner_r / TRIG_MAX_RATIO;
-      graphics_context_set_stroke_color(ctx, settings.PrimaryColor);
-      graphics_context_set_stroke_width(ctx, 3);
-      graphics_draw_line(ctx, gpoint_shift(center, x1, y1), gpoint_shift(center, x2, y2));
-      graphics_draw_line(ctx, gpoint_shift(center, -y1, x1), gpoint_shift(center, -y2, x2));
-      graphics_draw_line(ctx, gpoint_shift(center, -x1, -y1), gpoint_shift(center, -x2, -y2));
-      graphics_draw_line(ctx, gpoint_shift(center, y1, -x1), gpoint_shift(center, y2, -x2));
+    if (is_hour) {    
+      switch (settings.HourMarkers) {
+        case 0: // Line
+          int16_t inner_radius = notch_radius - 6;
+          int16_t x2 = cos * inner_radius / TRIG_MAX_RATIO;
+          int16_t y2 = sin * inner_radius / TRIG_MAX_RATIO;
+          quad_line(ctx, center, x, y, x2, y2);
+          break;
+        case 1: // Circle
+          quad_circle(ctx, center, x, y, 3);
+          break;
+        case 2: // Diamond
+          quad_gpath(ctx, s_notch_diamond_path, center, angle, notch_radius);
+          break;
+      }
     }
     else {
-      graphics_context_set_fill_color(ctx, settings.PrimaryColor);
-      graphics_fill_circle(ctx, gpoint_shift(center, x1, y1), 1);
-      graphics_fill_circle(ctx, gpoint_shift(center, -y1, x1), 1);
-      graphics_fill_circle(ctx, gpoint_shift(center, -x1, -y1), 1);
-      graphics_fill_circle(ctx, gpoint_shift(center, y1, -x1), 1);
+      quad_circle(ctx, center, x, y, 1);
     }
   }
   
@@ -485,12 +520,14 @@ static void init(void) {
   // so tick every second even though we only have a minute hand
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
   
-  // Initialize the primary hand path
+  // Initialize GPaths
   s_primary_hand_path = gpath_create(&PRIMARY_HAND_PATH_INFO);
+  s_notch_diamond_path = gpath_create(&NOTCH_DIAMOND_PATH_INFO);
 }
 
 static void deinit(void) {
   gpath_destroy(s_primary_hand_path);
+  gpath_destroy(s_notch_diamond_path);
   tick_timer_service_unsubscribe();
   window_destroy(s_window);
   app_message_deregister_callbacks();

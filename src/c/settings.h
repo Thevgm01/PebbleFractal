@@ -13,8 +13,9 @@ typedef struct {
   int16_t MinuteHandLength;
   int16_t HourHandLength;
   int16_t RecurseScale;
-  int16_t Font;
+  int8_t Font;
   int8_t PrimaryHandWidth;
+  int8_t HourMarkers;
   bool DebugGrid;
   bool DebugSpeed;
 } ClaySettings;
@@ -33,6 +34,7 @@ static void settings_restore_default() {
   settings.HourHandLength = 30;
   settings.RecurseScale = 85;
   settings.Font = 18;
+  settings.HourMarkers = 0;
   settings.PrimaryHandWidth = 5;
   settings.DebugGrid = false;
   settings.DebugSpeed = false;
@@ -56,6 +58,7 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   #define LOAD_COLOR(var, key) { t = dict_find(iterator, key); if (t) (var) = (GColorFromHEX(t->value->int32)); }
   #define LOAD_INT(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32); }
   #define LOAD_BOOL(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32 == 1); }
+  #define LOAD_SELECT(var, key) { t = dict_find(iterator, key); if (t) (var) = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring); }
   
   LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
   LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
@@ -67,16 +70,15 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.HourHandLength, MESSAGE_KEY_HourHandLength);
   LOAD_INT(settings.RecurseScale, MESSAGE_KEY_RecurseScale);
   LOAD_INT(settings.PrimaryHandWidth, MESSAGE_KEY_PrimaryHandWidth);
+  LOAD_SELECT(settings.Font, MESSAGE_KEY_Font);
+  LOAD_SELECT(settings.HourMarkers, MESSAGE_KEY_HourMarkers);
   LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
   LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
-  
-  // The "select" type in Clay always returns a string, so we have to convert it to an int
-  t = dict_find(iterator, MESSAGE_KEY_Font);
-  if (t) settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
   
   #undef LOAD_COLOR
   #undef LOAD_INT
   #undef LOAD_BOOL
+  #undef LOAD_SELECT
   
   // During recursion, the hour hand's length is calculated as a ratio of the minute hand's length
   // Thus if the hour hand is longer than the minute hand, that ratio will be greater than 1
