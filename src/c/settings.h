@@ -58,7 +58,7 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   #define LOAD_COLOR(var, key) { t = dict_find(iterator, key); if (t) (var) = (GColorFromHEX(t->value->int32)); }
   #define LOAD_INT(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32); }
   #define LOAD_BOOL(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32 == 1); }
-  #define LOAD_SELECT(var, key) { t = dict_find(iterator, key); if (t) (var) = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring); }
+  #define LOAD_SELECT(var, key) { t = dict_find(iterator, key); if (t) (var) = atoi(t->value->cstring); }
   
   LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
   LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
