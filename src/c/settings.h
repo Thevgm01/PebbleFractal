@@ -55,10 +55,10 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   
   Tuple *t;
   
-  #define LOAD(key) t = dict_find(iterator, key)
-  #define LOAD_COLOR(var, key) { LOAD(key); if (t) (var) = (GColorFromHEX(t->value->int32)); }
-  #define LOAD_INT(var, key) { LOAD(key); if (t) (var) = (t->value->int32); }
-  #define LOAD_BOOL(var, key) { LOAD(key); if (t) (var) = (t->value->int32 == 1); }
+  #define LOAD_COLOR(var, key) { t = dict_find(iterator, key); if (t) (var) = (GColorFromHEX(t->value->int32)); }
+  #define LOAD_INT(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32); }
+  #define LOAD_BOOL(var, key) { t = dict_find(iterator, key); if (t) (var) = (t->value->int32 == 1); }
+  
   LOAD_COLOR(settings.PrimaryColor, MESSAGE_KEY_PrimaryColor);
   LOAD_COLOR(settings.SecondaryColor, MESSAGE_KEY_SecondaryColor);
   LOAD_COLOR(settings.TertiaryColor, MESSAGE_KEY_TertiaryColor);
@@ -72,14 +72,14 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   LOAD_INT(settings.FirstHandScale, MESSAGE_KEY_FirstHandScale);
   LOAD_BOOL(settings.DebugGrid, MESSAGE_KEY_DebugGrid);
   LOAD_BOOL(settings.DebugSpeed, MESSAGE_KEY_DebugSpeed);
-  #undef LOAD
-  #undef LOAD_COLOR
-  #undef LOAD_INT
-  #undef LOAD_BOOL
   
   // The "select" type in Clay always returns a string, so we have to convert it to an int
   t = dict_find(iterator, MESSAGE_KEY_Font);
   if (t) settings.Font = atoi(dict_find(iterator, MESSAGE_KEY_Font)->value->cstring);
+  
+  #undef LOAD_COLOR
+  #undef LOAD_INT
+  #undef LOAD_BOOL
   
   // During recursion, the hour hand's length is calculated as a ratio of the minute hand's length
   // Thus if the hour hand is longer than the minute hand, that ratio will be greater than 1
