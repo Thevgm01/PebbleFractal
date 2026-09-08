@@ -25,7 +25,8 @@
             "DebugGrid",
             "DebugSpeed",
             "TertiaryColor",
-            "ShowGizmos"
+            "ShowGizmos",
+            "PrimaryHandWidth"
         ],
         "projectType": "native",
         "resources": {

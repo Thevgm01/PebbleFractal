@@ -119,6 +119,15 @@ module.exports = [
         "defaultValue": "Legibility"
       },
       {
+        "type": "slider",
+        "messageKey": "PrimaryHandWidth",
+        "label": "Primary Hand Width",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 10,
+        "step": 1
+      },
+      {
         "type": "toggle",
         "messageKey": "ShowGizmos",
         "label": "Show Minute/Hour Symbols",

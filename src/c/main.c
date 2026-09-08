@@ -327,7 +327,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 static void animation_update_proc(Animation *animation, const AnimationProgress progress) {
   s_max_animation_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
   s_length_mult_for_max_depth = progress - (s_max_animation_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
-  s_primary_hand_width = min(5, progress * 10 / ANIMATION_NORMALIZED_MAX);
+  s_primary_hand_width = min(settings.PrimaryHandWidth, progress * settings.PrimaryHandWidth * 2 / ANIMATION_NORMALIZED_MAX);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d\%)", s_max_animation_depth, s_length_mult_for_max_depth * MAX_RECURSION_DEPTH * 100 / ANIMATION_NORMALIZED_MAX);
   layer_mark_dirty(s_fractal_layer);
 }
@@ -359,6 +359,7 @@ static void post_settings_loaded() {
   layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
   
   s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
+  s_primary_hand_width = settings.PrimaryHandWidth;
   
   if (settings.ShowDate) {
     animation_stopped_proc(s_animation, false, NULL);
