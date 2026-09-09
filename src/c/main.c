@@ -18,6 +18,7 @@ static GRect s_window_bounds;
 static Layer *s_fractal_layer;
 static Layer *s_notch_layer;
 static TextLayer *s_date_layer;
+static int16_t s_seconds_elapsed = 0;
 
 // Animation
 static Animation *s_animation;
@@ -47,7 +48,7 @@ static const GPathInfo NOTCH_DIAMOND_PATH_INFO = {
 };
 
 // Screenshot mode
-static int16_t s_screenshot_frame = 0;
+static int16_t s_screenshot_frame = -15;
 
 // --- Drawing Functions --- //
 
@@ -168,24 +169,6 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   struct tm* t = localtime(&now);
   bool is_midnight = (t->tm_hour == 0 && t->tm_min == 0 && t->tm_sec == 0);
   
-  // Convert to angle
-  #ifdef RANDOM
-    srand(now);
-    s_hour_angle = rand() % TRIG_MAX_ANGLE;
-    s_minute_angle = rand() % TRIG_MAX_ANGLE;
-  #elif defined(SCREENSHOTMODE)
-    s_hour_angle = TRIG_MAX_ANGLE * 1 / 4;
-    s_minute_angle = TRIG_MAX_ANGLE * s_screenshot_frame / 60;
-    s_mark_points = true;
-  #else
-    s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
-    s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
-    if (settings.DebugSpeed) {
-      s_hour_angle = s_minute_angle;
-      s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
-    }
-  #endif
-  
   // Change the date on first load or at midnight
   bool change_date_text = settings.ShowDate && (ctx == NULL || is_midnight);
   if (change_date_text) {
@@ -198,7 +181,26 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
   bool check_for_date_move = change_date_text ||
     ((settings.DebugSpeed || t->tm_sec % 30 == 0) && // every frame with DebugSpeed, else twice per minute
      settings.ShowDate && !s_animation); // (if not animating)
-  
+
+  // Convert time to angle
+  #ifdef RANDOM
+    srand(now);
+    s_hour_angle = rand() % TRIG_MAX_ANGLE;
+    s_minute_angle = rand() % TRIG_MAX_ANGLE;
+  #elif defined(SCREENSHOTMODE)
+    s_hour_angle = TRIG_MAX_ANGLE * 1 / 4;
+    s_minute_angle = TRIG_MAX_ANGLE * s_screenshot_frame / 60;
+    change_date_text = ctx == NULL;
+    check_for_date_move = true;
+  #else
+    s_hour_angle = TRIG_MAX_ANGLE * (((t->tm_hour % 12) * 60) + t->tm_min) / (12 * 60);
+    s_minute_angle = TRIG_MAX_ANGLE * (t->tm_min * 60 + t->tm_sec) / (60 * 60);
+    if (settings.DebugSpeed) {
+      s_hour_angle = s_minute_angle;
+      s_minute_angle = TRIG_MAX_ANGLE * t->tm_sec / 60;
+    }
+  #endif
+
   // Draw fractal
   s_fractal_ctx = ctx;
   if (ctx != NULL) {
@@ -345,16 +347,26 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 // --- Ticks --- //
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  // Redraw the fractal every 10 seconds
-  if (!s_animation && (settings.DebugSpeed || tick_time->tm_sec % 10 == 0)) {
-
-    #ifdef SCREENSHOTMODE
-    s_screenshot_frame = (s_screenshot_frame + 1) % 60;
-    #endif
-
-    layer_mark_dirty(s_fractal_layer);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: tick_handler");
-  }
+  s_seconds_elapsed++;
+  
+  #ifdef SCREENSHOTMODE
+    // Take a screenshot every 2 seconds
+    if (s_screenshot_frame < -1) {
+      s_screenshot_frame++;
+      layer_mark_dirty(s_fractal_layer);
+    }
+    else if (s_seconds_elapsed % 2 == 0) {
+      s_screenshot_frame++;
+      layer_mark_dirty(s_fractal_layer);
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "SCREENSHOTFRAME:%02d", s_screenshot_frame);
+    }
+  #else
+    // Redraw the fractal every 10 seconds
+    if (!s_animation && (settings.DebugSpeed || tick_time->tm_sec % 10 == 0)) {
+      layer_mark_dirty(s_fractal_layer);
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: tick_handler");
+    }
+  #endif
 }
 
 // --- Animation --- //
