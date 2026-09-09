@@ -1,14 +1,13 @@
 #!/bin/bash
 
-# Requires jq, ImageMagick
+# Requires jq
 
 PLATFORMS=($(jq -r '.pebble.targetPlatforms[]' package.json))
 FRAMES=60
 INTERVAL=3
 
-echo "Deleting media folder..."
-rm -rf "media/"
-mkdir -p "media/gifs"
+echo "Deleting media/images folder..."
+rm -rf "media/images"
 sleep 1
 
 echo "Building..."
@@ -46,12 +45,6 @@ for PLATFORM in "${PLATFORMS[@]}"; do
   sleep 1
   
   echo "Closing emulator..."
-  sleep 1
-  
-  echo "Making gif..."
-  # A delay of 0.03 seconds between images is approximately 30FPS
-  convert -delay 5 -loop 0 "media/images/$PLATFORM/*.png" "media/gifs/$PLATFORM.gif"
-  echo "Saved as media/$PLATFORM.gif"
   sleep 1
 done
 
