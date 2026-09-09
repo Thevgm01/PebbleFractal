@@ -120,16 +120,23 @@ static void draw_hands_recursive(GPoint origin, int16_t base_angle, int16_t leng
   }
 }
 
-static void gpath_isosceles_triangle(GPoint points[], GPoint center, int32_t angle, int16_t length, int16_t width) {
-  int32_t right_angle = add_angles2(angle, TRIG_MAX_ANGLE / 4);
-  int16_t axis_aligned_offset = angle % (TRIG_MAX_ANGLE / 4) == 0 ? 1 : 0;
-  GPoint side_offset = point_on_circle(GPointZero, right_angle, width - axis_aligned_offset);
-  GPoint tip = point_on_circle(center, angle, length);
-  GPoint tip_offset = point_on_circle(GPointZero, right_angle, 2 - axis_aligned_offset);
-  points[0] = gpoint_shift(center, -side_offset.x, -side_offset.y);
-  points[1] = gpoint_shift(tip, -tip_offset.x, -tip_offset.y);
-  points[2] = gpoint_shift(tip, tip_offset.x, tip_offset.y);
-  points[3] = gpoint_shift(center, side_offset.x, side_offset.y);
+static void draw_primary_hand(int32_t angle, int16_t length) {
+  int8_t right_angle = min(angle % (TRIG_MAX_ANGLE / 4) == 0 ? 1 : 2, s_primary_hand_width - 1);
+  s_primary_hand_path->points[1] = GPoint(-right_angle, length);
+  s_primary_hand_path->points[2] = GPoint(right_angle, length);
+  gpath_rotate_to(s_primary_hand_path, angle);
+  gpath_draw_filled(s_fractal_ctx, s_primary_hand_path);
+}
+
+static void draw_primary_hands(GPoint center) {
+  graphics_context_set_antialiased(s_fractal_ctx, true);
+  graphics_context_set_fill_color(s_fractal_ctx, settings.PrimaryColor);
+  
+  graphics_fill_circle(s_fractal_ctx, center, s_primary_hand_width - 2);
+  
+  gpath_move_to(s_primary_hand_path, center);
+  draw_primary_hand(add_angles2(s_minute_angle, TRIG_MAX_ANGLE / 2), settings.MinuteHandLength);
+  draw_primary_hand(add_angles2(s_hour_angle, TRIG_MAX_ANGLE / 2), settings.HourHandLength);
 }
 
 static void move_date() {  
@@ -216,14 +223,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
 
   // Draw the primary hands
   if (ctx != NULL && s_primary_hand_width > 0) {
-    graphics_context_set_antialiased(ctx, true);
-    graphics_context_set_fill_color(ctx, settings.PrimaryColor);
-    
-    graphics_fill_circle(ctx, center, s_primary_hand_width - 2);
-    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_minute_angle, settings.MinuteHandLength, s_primary_hand_width);
-    gpath_draw_filled(ctx, s_primary_hand_path);
-    gpath_isosceles_triangle(s_primary_hand_path->points, center, s_hour_angle, settings.HourHandLength, s_primary_hand_width);
-    gpath_draw_filled(ctx, s_primary_hand_path);
+    draw_primary_hands(center);
   }
   
 	// Move the date if we changed the text or...
@@ -375,6 +375,8 @@ static void animation_update_proc(Animation *animation, const AnimationProgress 
   s_max_animation_depth = progress * MAX_RECURSION_DEPTH / ANIMATION_NORMALIZED_MAX;
   s_length_mult_for_max_depth = progress - (s_max_animation_depth * ANIMATION_NORMALIZED_MAX / MAX_RECURSION_DEPTH);
   s_primary_hand_width = min(settings.PrimaryHandWidth, progress * settings.PrimaryHandWidth * 2 / ANIMATION_NORMALIZED_MAX);
+  s_primary_hand_path->points[0] = GPoint(-s_primary_hand_width, 0);
+  s_primary_hand_path->points[3] = GPoint(s_primary_hand_width, 0);
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Dirty: animation_update_proc (Depth: %d, progress: %d\%)", s_max_animation_depth, s_length_mult_for_max_depth * MAX_RECURSION_DEPTH * 100 / ANIMATION_NORMALIZED_MAX);
   layer_mark_dirty(s_fractal_layer);
 }
@@ -425,6 +427,8 @@ static void post_settings_loaded() {
   
   // Auto-set the hand width
   s_primary_hand_width = settings.PrimaryHandWidth;
+  s_primary_hand_path->points[0] = GPoint(-s_primary_hand_width, 0);
+  s_primary_hand_path->points[3] = GPoint(s_primary_hand_width, 0);
   
   // Date-related things
   layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
@@ -518,6 +522,7 @@ static void window_load(Window *window) {
   });
   #endif
   
+  // Area stuff
   unobstructed_area_service_subscribe((UnobstructedAreaHandlers) {
     .will_change = area_change_handler
   }, NULL);
@@ -539,6 +544,10 @@ static void init(void) {
   app_message_register_inbox_received(settings_inbox_received_callback);
   app_message_open(256, 0);
   
+  // Initialize GPaths
+  s_primary_hand_path = gpath_create(&PRIMARY_HAND_PATH_INFO);
+  s_notch_diamond_path = gpath_create(&NOTCH_DIAMOND_PATH_INFO);
+  
   // Create the main window
   s_window = window_create();
   window_set_background_color(s_window, settings.BackgroundColor);
@@ -551,10 +560,6 @@ static void init(void) {
   // The fractal can change a lot over a short time,
   // so tick every second even though we only have a minute hand
   tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
-  
-  // Initialize GPaths
-  s_primary_hand_path = gpath_create(&PRIMARY_HAND_PATH_INFO);
-  s_notch_diamond_path = gpath_create(&NOTCH_DIAMOND_PATH_INFO);
 }
 
 static void deinit(void) {
