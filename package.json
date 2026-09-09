@@ -33,7 +33,15 @@
         ],
         "projectType": "native",
         "resources": {
-            "media": []
+            "media": [
+                {
+                    "file": "images/AnalogFractalThumbnail.png",
+                    "menuIcon": true,
+                    "name": "THUMBNAIL",
+                    "targetPlatforms": null,
+                    "type": "png"
+                }
+            ]
         },
         "sdkVersion": "3",
         "targetPlatforms": [
