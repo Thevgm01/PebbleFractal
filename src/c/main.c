@@ -389,13 +389,33 @@ static void start_animation() {
 // --- Settings --- //
 
 static void post_settings_loaded() {
+  // During recursion, the hour hand's length is calculated as a ratio of the minute hand's length
+  // Thus if the hour hand is longer than the minute hand, that ratio will be greater than 1
+  // If that, times the recursion ratio, is 1 or greater, then the fractal ends up growing instead of shrinking
+  // So, we clamp the hour hand so it can't ever be bigger than the minute hand
+  
+  // Perhaps a better solution would swap the recursion multiplication order if the sizes are inverted
+  // Then again, what twisted soul is going to make the hour hand longer than the minute hand?
+  settings.HourHandLength = min(settings.MinuteHandLength, settings.HourHandLength);
+  
+  // Making the notches have a squircle shape only works on rectangular watches
+  #ifdef PBL_ROUND
+  settings.NotchSquircle = false;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, settings.NotchSquircle ? "Yes" : "No");
+  #endif
+  
+  // Set specific layer colors
   text_layer_set_text_color(s_date_layer, settings.PrimaryColor);
   window_set_background_color(s_window, settings.BackgroundColor);
-  layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
   
+  // Calculate 
   s_hour_hand_scale = settings.HourHandLength * 100 / settings.MinuteHandLength;
+  
+  // Auto-set the hand width
   s_primary_hand_width = settings.PrimaryHandWidth;
   
+  // Date-related things
+  layer_set_hidden(text_layer_get_layer(s_date_layer), !settings.ShowDate); // Also hide if DebugGrid is enabled
   if (settings.ShowDate) {
     animation_stopped_proc(s_animation, false, NULL);
     

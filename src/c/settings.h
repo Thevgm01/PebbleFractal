@@ -85,22 +85,8 @@ static void settings_inbox_received_callback(DictionaryIterator *iterator, void 
   #undef LOAD_INT
   #undef LOAD_BOOL
   #undef LOAD_SELECT
-  
-  // During recursion, the hour hand's length is calculated as a ratio of the minute hand's length
-  // Thus if the hour hand is longer than the minute hand, that ratio will be greater than 1
-  // If that, times the recursion ratio, is 1 or greater, then the fractal ends up growing instead of shrinking
-  // So, we clamp the hour hand so it can't ever be bigger than the minute hand
-  
-  // Perhaps a better solution would swap the recursion multiplication order if the sizes are inverted
-  // Then again, what twisted soul is going to make the hour hand longer than the minute hand?
-  settings.HourHandLength = min(settings.MinuteHandLength, settings.HourHandLength);
-  
-  // Making the notches have a squircle shape only works on rectangular watches
-  #ifdef PBL_ROUND
-  settings.NotchSquircle = false;
-  #endif
+
+  if (settings_loaded_callback) settings_loaded_callback();
 
   settings_save();
-  
-  if (settings_loaded_callback) settings_loaded_callback();
 }
