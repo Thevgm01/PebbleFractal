@@ -296,18 +296,20 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
 
     int32_t cos = cos_lookup(angle);
     int32_t sin = sin_lookup(angle);
-    int16_t x = cos * notch_radius / TRIG_MAX_RATIO;
-    int16_t y = sin * notch_radius / TRIG_MAX_RATIO;
     
     if (is_hour) {    
       switch (settings.HourMarkers) {
         case 0: // Line
           int16_t inner_radius = notch_radius - 6;
+          int16_t x1 = cos * (notch_radius + 1) / TRIG_MAX_RATIO;
+          int16_t y1 = sin * (notch_radius + 1) / TRIG_MAX_RATIO;
           int16_t x2 = cos * inner_radius / TRIG_MAX_RATIO;
           int16_t y2 = sin * inner_radius / TRIG_MAX_RATIO;
-          quad_line(ctx, center, x, y, x2, y2);
+          quad_line(ctx, center, x1, y1, x2, y2);
           break;
         case 1: // Circle
+          int16_t x = cos * notch_radius / TRIG_MAX_RATIO;
+          int16_t y = sin * notch_radius / TRIG_MAX_RATIO;
           quad_circle(ctx, center, x, y, 3);
           break;
         case 2: // Diamond
@@ -316,6 +318,8 @@ static void notch_update_proc(Layer *layer, GContext *ctx) {
       }
     }
     else {
+      int16_t x = cos * notch_radius / TRIG_MAX_RATIO;
+      int16_t y = sin * notch_radius / TRIG_MAX_RATIO;
       quad_circle(ctx, center, x, y, 1);
     }
   }
