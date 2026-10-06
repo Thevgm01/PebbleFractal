@@ -153,7 +153,7 @@ module.exports = [
         "messageKey": "NotchSquircle",
         "label": "Squircleify",
         "defaultValue": true,
-        "description": "Only works on square watches"
+        "capabilities": ["NOT_ROUND"]
       },
       {
         "type": "toggle",
