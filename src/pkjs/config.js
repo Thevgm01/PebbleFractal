@@ -187,6 +187,11 @@ module.exports = [
     ]
   },
   {
+    "type": "button",
+    "id": "reset-button",
+    "defaultValue": "Restore Defaults"
+  },
+  {
     "type": "submit",
     "defaultValue": "Save Settings"
   }
