@@ -195,7 +195,7 @@ static void fractal_update_proc(Layer *layer, GContext *ctx) {
     s_hour_angle = rand() % TRIG_MAX_ANGLE;
     s_minute_angle = rand() % TRIG_MAX_ANGLE;
   #elif defined(SCREENSHOTMODE)
-    s_hour_angle = TRIG_MAX_ANGLE * 2 / 3;
+    s_hour_angle = TRIG_MAX_ANGLE * 1 / 6;
     s_minute_angle = TRIG_MAX_ANGLE * s_screenshot_frame / 60;
     change_date_text = ctx == NULL;
     check_for_date_move = true;
